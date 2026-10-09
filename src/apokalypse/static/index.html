@@ -108,6 +108,8 @@
         <h3>Network</h3>
         <div class="three-col"><label>Listen port<input name="listen_port" type="number" min="1" max="65535"></label><label>Max connections<input name="max_connections" type="number" min="10"></label><label>Start torrents<select name="auto_start"><option value="true">Automatically</option><option value="false">Paused</option></select></label></div>
         <div class="toggle-grid"><label><input name="enable_dht" type="checkbox"> DHT</label><label><input name="enable_pex" type="checkbox"> Peer exchange</label><label><input name="enable_lsd" type="checkbox"> Local discovery</label><label><input name="enable_upnp" type="checkbox"> UPnP</label><label><input name="enable_natpmp" type="checkbox"> NAT-PMP</label></div>
+        <h3>Browser integration</h3>
+        <div class="integration-row"><div><strong>Open magnet links in BT Apokalypse</strong><small id="magnet-handler-status">Checking Windows association…</small></div><button type="button" class="secondary" id="magnet-handler-toggle">Enable</button></div>
         <h3>Speed limits <small>(0 is unlimited)</small></h3>
         <div class="two-col"><label>Download KiB/s<input name="download_limit_kib" type="number" min="0"></label><label>Upload KiB/s<input name="upload_limit_kib" type="number" min="0"></label></div>
       </div>

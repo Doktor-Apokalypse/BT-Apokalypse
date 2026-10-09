@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .engine import TorrentEngine
-
+from .protocol import magnet_handler_status, register_magnet_handler, unregister_magnet_handler
 
 STATIC_DIR = Path(__file__).with_name("static")
 
@@ -116,12 +116,12 @@ def add_magnet(payload: MagnetInput, request: Request) -> dict[str, Any]:
 
 @app.post("/api/torrents/file", status_code=201)
 async def add_torrent_file(
-    request: Request,
-    torrent: Annotated[UploadFile, File()],
-    save_path: Annotated[str | None, Form()] = None,
-    completed_path: Annotated[str | None, Form()] = None,
-    sequential: Annotated[bool, Form()] = False,
-    paused: Annotated[bool, Form()] = False,
+        request: Request,
+        torrent: Annotated[UploadFile, File()],
+        save_path: Annotated[str | None, Form()] = None,
+        completed_path: Annotated[str | None, Form()] = None,
+        sequential: Annotated[bool, Form()] = False,
+        paused: Annotated[bool, Form()] = False,
 ) -> dict[str, Any]:
     try:
         return engine(request).add_torrent_bytes(
@@ -149,7 +149,7 @@ def update_torrent(torrent_id: str, payload: TorrentUpdate, request: Request) ->
 
 @app.delete("/api/torrents/{torrent_id}", status_code=204)
 def remove_torrent(
-    torrent_id: str, request: Request, delete_files: bool = Query(False)
+        torrent_id: str, request: Request, delete_files: bool = Query(False)
 ) -> None:
     try:
         engine(request).remove(torrent_id, delete_files)
@@ -210,6 +210,27 @@ def update_settings(request: Request, changes: dict[str, Any] = Body(...)) -> di
         raise api_error(exc) from exc
 
 
+@app.get("/api/integration/magnet")
+def magnet_integration_status() -> dict[str, Any]:
+    return magnet_handler_status()
+
+
+@app.post("/api/integration/magnet")
+def register_magnet_integration() -> dict[str, Any]:
+    try:
+        return register_magnet_handler()
+    except RuntimeError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/integration/magnet")
+def unregister_magnet_integration() -> dict[str, Any]:
+    try:
+        return unregister_magnet_handler()
+    except RuntimeError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
 @app.get("/api/directories")
 def directories(path: str | None = None) -> dict[str, Any]:
     try:
@@ -264,7 +285,8 @@ def add_blocklist_url(payload: UrlBlocklistInput, request: Request) -> dict[str,
         raise HTTPException(400, "Blocklist URL must use HTTP or HTTPS")
     try:
         request_headers = {"User-Agent": "BT-Apokalypse/0.1"}
-        with urllib.request.urlopen(urllib.request.Request(payload.url, headers=request_headers), timeout=20) as response:
+        with urllib.request.urlopen(urllib.request.Request(payload.url, headers=request_headers),
+                                    timeout=20) as response:
             contents = response.read(50 * 1024 * 1024 + 1)
         if len(contents) > 50 * 1024 * 1024:
             raise HTTPException(413, "Blocklists may not exceed 50 MiB")
@@ -286,4 +308,3 @@ def ban_ip(payload: BanInput, request: Request) -> dict[str, int]:
 @app.delete("/api/blocklist", status_code=204)
 def clear_blocklist(request: Request) -> None:
     engine(request).clear_blocklist()
-

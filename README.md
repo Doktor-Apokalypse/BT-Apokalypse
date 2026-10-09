@@ -16,6 +16,7 @@ BT Apokalypse is a self-hosted BitTorrent client with a browser interface. Its t
 - Peer inspection and one-click persistent IP bans
 - PeerGuardian, eMule, CIDR, IP-range, and single-IP blocklist imports from a file or URL
 - Server-side folder browser, including Windows drive selection
+- Windows `magnet:` protocol integration for links clicked in Chrome, Edge, Firefox, and other browsers
 
 ## Run it
 
@@ -30,6 +31,18 @@ apokalypse
 
 Open <http://127.0.0.1:8080>. The WebUI listens on localhost by default. Torrent traffic listens on
 port `6881` by default and can be changed in Settings.
+
+On Windows, open **Settings → Browser integration** and enable the magnet handler. Browsers may show a
+one-time confirmation before opening BT Apokalypse. If the client is not running when a magnet link is
+clicked, the handler starts it in the background and then adds the torrent. The setting is reversible
+and restores the previous per-user magnet handler when one was present.
+
+The same integration can be managed from PowerShell:
+
+```powershell
+apokalypse --register-magnet
+apokalypse --unregister-magnet
+```
 
 The configured folders are paths on the computer running BT Apokalypse. The process must have read and
 write access to them. Application state is stored in `./data`; set `APOKALYPSE_DATA_DIR` to place it

@@ -128,8 +128,20 @@ async function openSettings() {
   try {
     state.settings = await api("/api/settings"); const form = $("#settings-form");
     Object.entries(state.settings).forEach(([key,value]) => { const field = form.elements.namedItem(key); if (!field) return; if (field.type === "checkbox") field.checked = !!value; else field.value = String(value); });
-    show($("#settings-dialog"));
+    show($("#settings-dialog")); await loadMagnetHandler();
   } catch (error) { toast(error.message,true); }
+}
+async function loadMagnetHandler() {
+  try {
+    const integration = await api("/api/integration/magnet"); const button = $("#magnet-handler-toggle");
+    button.dataset.registered = String(integration.registered); button.textContent = integration.registered ? "Disable" : "Enable";
+    button.disabled = !integration.supported; $("#magnet-handler-status").textContent = !integration.supported ? "Available on Windows" : integration.registered ? "Registered for this Windows account" : "Magnet links currently use another application";
+  } catch (error) { $("#magnet-handler-status").textContent = error.message; }
+}
+async function toggleMagnetHandler() {
+  const registered = $("#magnet-handler-toggle").dataset.registered === "true";
+  try { await api("/api/integration/magnet", {method: registered ? "DELETE" : "POST"}); await loadMagnetHandler(); toast(registered ? "Magnet link handling disabled" : "Magnet links will open in BT Apokalypse"); }
+  catch (error) { toast(error.message, true); }
 }
 async function saveSettings(event) {
   event.preventDefault(); const form = new FormData(event.target); const payload = {};
@@ -166,6 +178,7 @@ document.addEventListener("click", async event => {
 });
 
 $("#add-open").onclick = $("#empty-add").onclick = openAdd; $("#add-form").onsubmit = submitAdd; $("#settings-open").onclick = openSettings; $("#settings-form").onsubmit = saveSettings; $("#blocklist-open").onclick = openBlocklist;
+$("#magnet-handler-toggle").onclick = toggleMagnetHandler;
 $("#search").oninput = event => { state.search = event.target.value; render(); }; $("#resume-selected").onclick = () => actionSelected("resume"); $("#pause-selected").onclick = () => actionSelected("pause"); $("#remove-selected").onclick = removeSelected;
 $("#select-all").onchange = event => { state.torrents.filter(matchesFilter).forEach(t => event.target.checked ? state.selected.add(t.id) : state.selected.delete(t.id)); render(); };
 $("#torrent-list").addEventListener("dblclick", event => { const row=event.target.closest("tr"); if(row) api(`/api/torrents/${row.dataset.id}/action`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"resume"})}).then(refresh); });
