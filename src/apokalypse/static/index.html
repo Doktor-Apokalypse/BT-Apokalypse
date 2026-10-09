@@ -11,7 +11,7 @@
     <aside class="sidebar">
       <a class="brand" href="/" aria-label="BT Apokalypse home">
         <img class="brand-logo" src="/static/logo.png" alt="">
-        <span><strong>APOKALYPSE</strong><small>BITTORRENT CLIENT</small></span>
+        <span><strong>BT APOKALYPSE</strong><small>BITTORRENT CLIENT</small></span>
       </a>
       <nav class="filters" aria-label="Torrent filters">
         <button class="filter active" data-filter="all"><span class="dot all"></span>All torrents <b id="count-all">0</b></button>
@@ -46,16 +46,20 @@
       <section class="content">
         <div class="title-row">
           <div><p class="eyebrow">TRANSFER QUEUE</p><h1 id="view-title">All torrents</h1></div>
-          <div class="bulk-actions">
-            <button id="resume-selected" title="Resume selected">▶</button>
-            <button id="pause-selected" title="Pause selected">Ⅱ</button>
-            <button id="remove-selected" title="Remove selected">⌫</button>
+          <div class="list-actions">
+            <label class="sort-control"><span>Sort by</span><select id="sort-select"><option value="added_at">Date added</option><option value="name">Name</option><option value="total_size">File size</option><option value="progress">Progress</option><option value="download_rate">Download speed</option><option value="upload_rate">Upload speed</option><option value="peers">Peers</option><option value="eta">ETA</option></select></label>
+            <button class="sort-direction" id="sort-direction" title="Reverse sort order" aria-label="Reverse sort order">↓</button>
+            <div class="bulk-actions">
+              <button id="resume-selected" title="Resume selected">▶</button>
+              <button id="pause-selected" title="Pause selected">Ⅱ</button>
+              <button id="remove-selected" title="Remove selected">⌫</button>
+            </div>
           </div>
         </div>
 
         <div class="torrent-table-wrap">
           <table class="torrent-table">
-            <thead><tr><th class="check"><input type="checkbox" id="select-all" aria-label="Select all"></th><th>Name</th><th>Size</th><th>Progress</th><th>Down</th><th>Up</th><th>Peers</th><th>ETA</th><th></th></tr></thead>
+            <thead><tr><th class="check"><input type="checkbox" id="select-all" aria-label="Select all"></th><th class="sort-head" data-sort="name">Name</th><th class="sort-head" data-sort="total_size">Size</th><th class="sort-head" data-sort="progress">Progress</th><th class="sort-head" data-sort="download_rate">Down</th><th class="sort-head" data-sort="upload_rate">Up</th><th class="sort-head" data-sort="peers">Peers</th><th class="sort-head" data-sort="eta">ETA</th><th></th></tr></thead>
             <tbody id="torrent-list"></tbody>
           </table>
           <div class="empty" id="empty-state">

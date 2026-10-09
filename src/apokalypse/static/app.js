@@ -1,4 +1,4 @@
-const state = { torrents: [], status: {}, settings: {}, filter: "all", search: "", selected: new Set(), detailId: null, detailTab: "files", addTab: "magnet", folderTarget: null, folderParent: null };
+const state = { torrents: [], status: {}, settings: {}, filter: "all", search: "", sortKey: "added_at", sortDirection: "desc", selected: new Set(), detailId: null, detailTab: "files", addTab: "magnet", folderTarget: null, folderParent: null };
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -27,6 +27,18 @@ function toast(message, error = false) {
 }
 function show(dialog) { dialog.showModal(); }
 function closeDialog(element) { element.closest("dialog")?.close(); }
+function saveSort() { try { localStorage.setItem("apokalypse-sort", JSON.stringify({key:state.sortKey,direction:state.sortDirection})); } catch (_) {} }
+function restoreSort() { try { const saved=JSON.parse(localStorage.getItem("apokalypse-sort")); if (["added_at","name","total_size","progress","download_rate","upload_rate","peers","eta"].includes(saved?.key)) state.sortKey=saved.key; if (["asc","desc"].includes(saved?.direction)) state.sortDirection=saved.direction; } catch (_) {} }
+function sortTorrents(items) {
+  const direction = state.sortDirection === "asc" ? 1 : -1;
+  return items.slice().sort((left,right) => {
+    let a=left[state.sortKey], b=right[state.sortKey];
+    if (a == null && b == null) return right.added_at-left.added_at;
+    if (a == null) return 1; if (b == null) return -1;
+    const comparison = state.sortKey === "name" ? String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"}) : Number(a)-Number(b);
+    return comparison ? comparison*direction : right.added_at-left.added_at;
+  });
+}
 
 async function refresh() {
   try {
@@ -49,10 +61,12 @@ function render() {
   state.torrents.forEach(t => { if (counts[t.state] !== undefined) counts[t.state]++; if (["completed","seeding"].includes(t.state)) counts.completed++; });
   Object.entries(counts).forEach(([key,value]) => { const node = $(`#count-${key}`); if (node) node.textContent = value; });
   const query = state.search.toLowerCase();
-  const visible = state.torrents.filter(t => matchesFilter(t) && t.name.toLowerCase().includes(query));
+  const visible = sortTorrents(state.torrents.filter(t => matchesFilter(t) && t.name.toLowerCase().includes(query)));
   $("#torrent-list").innerHTML = visible.map(torrentRow).join("");
   $("#empty-state").classList.toggle("show", visible.length === 0); $(".torrent-table").style.display = visible.length ? "table" : "none";
   $("#select-all").checked = visible.length > 0 && visible.every(t => state.selected.has(t.id));
+  $("#sort-select").value = state.sortKey; $("#sort-direction").textContent = state.sortDirection === "asc" ? "↑" : "↓";
+  $$(".sort-head").forEach(header => { const active=header.dataset.sort===state.sortKey; header.classList.toggle("active",active); header.dataset.arrow=active ? (state.sortDirection==="asc" ? "↑" : "↓") : ""; header.setAttribute("aria-sort",active ? (state.sortDirection==="asc" ? "ascending" : "descending") : "none"); });
 }
 function torrentRow(t) {
   const selected = state.selected.has(t.id); const sub = t.error || t.state.replaceAll("_", " ");
@@ -169,6 +183,7 @@ function chooseFolder() { const path = $("#folder-current").value; const target 
 document.addEventListener("click", async event => {
   const close = event.target.closest("[data-close]"); if (close) return closeDialog(close);
   const filter = event.target.closest(".filter"); if (filter) { state.filter = filter.dataset.filter; $$(".filter").forEach(f => f.classList.toggle("active",f===filter)); $("#view-title").textContent = filter.textContent.replace(/\d+$/,"").trim(); return render(); }
+  const sortHeader = event.target.closest("[data-sort]"); if (sortHeader) { const key=sortHeader.dataset.sort; if (state.sortKey===key) state.sortDirection=state.sortDirection==="asc"?"desc":"asc"; else { state.sortKey=key; state.sortDirection=key==="name"?"asc":"desc"; } saveSort(); return render(); }
   const browseButton = event.target.closest("[data-browse]"); if (browseButton) return browse(browseButton.dataset.browse);
   const row = event.target.closest("#torrent-list tr"); if (row) { if (event.target.matches('input[type="checkbox"]')) { event.target.checked ? state.selected.add(row.dataset.id) : state.selected.delete(row.dataset.id); return render(); } return openDetails(row.dataset.id); }
   const detailTab = event.target.closest("[data-detail-tab]"); if (detailTab) { state.detailTab = detailTab.dataset.detailTab; $$("[data-detail-tab]").forEach(t => t.classList.toggle("active",t===detailTab)); return loadDetail(); }
@@ -180,6 +195,7 @@ document.addEventListener("click", async event => {
 $("#add-open").onclick = $("#empty-add").onclick = openAdd; $("#add-form").onsubmit = submitAdd; $("#settings-open").onclick = openSettings; $("#settings-form").onsubmit = saveSettings; $("#blocklist-open").onclick = openBlocklist;
 $("#magnet-handler-toggle").onclick = toggleMagnetHandler;
 $("#search").oninput = event => { state.search = event.target.value; render(); }; $("#resume-selected").onclick = () => actionSelected("resume"); $("#pause-selected").onclick = () => actionSelected("pause"); $("#remove-selected").onclick = removeSelected;
+$("#sort-select").onchange = event => { state.sortKey=event.target.value; state.sortDirection=state.sortKey==="name"?"asc":"desc"; saveSort(); render(); }; $("#sort-direction").onclick = () => { state.sortDirection=state.sortDirection==="asc"?"desc":"asc"; saveSort(); render(); };
 $("#select-all").onchange = event => { state.torrents.filter(matchesFilter).forEach(t => event.target.checked ? state.selected.add(t.id) : state.selected.delete(t.id)); render(); };
 $("#torrent-list").addEventListener("dblclick", event => { const row=event.target.closest("tr"); if(row) api(`/api/torrents/${row.dataset.id}/action`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"resume"})}).then(refresh); });
 $("#detail-content").addEventListener("change", async event => { if (!event.target.matches(".file-priority")) return; try { await api(`/api/torrents/${state.detailId}/files`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({priorities:{[event.target.dataset.index]:Number(event.target.value)}})}); } catch(error){toast(error.message,true);} });
@@ -193,4 +209,4 @@ $("#folder-up").onclick = () => state.folderParent && loadFolder(state.folderPar
 $("#folder-list").onclick = event => { const item=event.target.closest("[data-path]"); if(item) loadFolder(item.dataset.path); }; $("#folder-roots").onclick = event => { const item=event.target.closest("[data-path]"); if(item) loadFolder(item.dataset.path); };
 const dropZone=$("#drop-zone"); ["dragenter","dragover"].forEach(type=>dropZone.addEventListener(type,event=>{event.preventDefault();dropZone.classList.add("drag");})); ["dragleave","drop"].forEach(type=>dropZone.addEventListener(type,event=>{event.preventDefault();dropZone.classList.remove("drag");})); dropZone.addEventListener("drop",event=>{$("#torrent-file").files=event.dataTransfer.files;});
 
-refresh(); setInterval(refresh, 1500);
+restoreSort(); refresh(); setInterval(refresh, 1500);
