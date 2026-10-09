@@ -5,7 +5,16 @@ from pathlib import Path
 import libtorrent as lt
 
 from apokalypse.config import JsonStore
-from apokalypse.engine import TorrentEngine
+from apokalypse.engine import TorrentEngine, _is_complete
+
+
+def test_paused_finished_torrent_is_complete() -> None:
+    class PausedFinishedStatus:
+        paused = True
+        is_finished = True
+        is_seeding = False
+
+    assert _is_complete(PausedFinishedStatus()) is True
 
 
 def make_torrent(folder: Path) -> bytes:

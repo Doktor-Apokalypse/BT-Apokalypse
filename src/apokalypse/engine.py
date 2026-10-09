@@ -42,6 +42,10 @@ def _state_name(status: lt.torrent_status) -> str:
     return names.get(status.state, "queued")
 
 
+def _is_complete(status: lt.torrent_status) -> bool:
+    return bool(status.is_finished or status.is_seeding)
+
+
 class TorrentEngine:
     """Thread-safe facade around one libtorrent session."""
 
@@ -267,6 +271,7 @@ class TorrentEngine:
             "id": torrent_id,
             "name": status.name or record.get("name") or torrent_id,
             "state": _state_name(status),
+            "is_complete": _is_complete(status),
             "error": status.errc.message() if status.errc and status.errc.value() else "",
             "progress": round(status.progress * 100, 2),
             "download_rate": status.download_rate,

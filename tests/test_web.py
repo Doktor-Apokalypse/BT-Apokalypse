@@ -20,6 +20,9 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
         assert 'data-remove-files="true"' in page.text
         assert 'id="remove-confirm-dialog"' in page.text
         assert client.get("/static/logo.png").headers["content-type"] == "image/png"
+        script = client.get("/static/app.js")
+        assert script.status_code == 200
+        assert 'if (state.filter === "completed") return isComplete(torrent);' in script.text
 
         status = client.get("/api/status").json()
         assert status["torrents"] == 0

@@ -47,9 +47,13 @@ async function refresh() {
     if (state.detailId && $("#details-dialog").open) updateDetailHeader();
   } catch (error) { $("#network-label").textContent = "Engine offline"; $("#network-light").classList.remove("online"); }
 }
+function isComplete(torrent) {
+  if (typeof torrent.is_complete === "boolean") return torrent.is_complete;
+  return ["completed", "seeding"].includes(torrent.state) || (Number(torrent.total_size) > 0 && Number(torrent.wanted_done) >= Number(torrent.total_size));
+}
 function matchesFilter(torrent) {
   if (state.filter === "all") return true;
-  if (state.filter === "completed") return ["completed", "seeding"].includes(torrent.state);
+  if (state.filter === "completed") return isComplete(torrent);
   return torrent.state === state.filter;
 }
 function render() {
@@ -58,7 +62,7 @@ function render() {
   $("#listen-port").textContent = state.status.listen_port || "—"; $("#network-label").textContent = state.status.listening ? "Network active" : "Not listening";
   $("#network-light").classList.toggle("online", !!state.status.listening); $("#footer-version").textContent = `libtorrent ${state.status.libtorrent_version || ""}`;
   const counts = {all: state.torrents.length, downloading:0, seeding:0, completed:0, paused:0, error:0};
-  state.torrents.forEach(t => { if (counts[t.state] !== undefined) counts[t.state]++; if (["completed","seeding"].includes(t.state)) counts.completed++; });
+  state.torrents.forEach(t => { if (t.state !== "completed" && counts[t.state] !== undefined) counts[t.state]++; if (isComplete(t)) counts.completed++; });
   Object.entries(counts).forEach(([key,value]) => { const node = $(`#count-${key}`); if (node) node.textContent = value; });
   const query = state.search.toLowerCase();
   const visible = sortTorrents(state.torrents.filter(t => matchesFilter(t) && t.name.toLowerCase().includes(query)));
