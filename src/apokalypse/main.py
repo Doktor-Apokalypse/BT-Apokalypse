@@ -13,7 +13,12 @@ def run() -> None:
     parser.add_argument("--unregister-magnet", action="store_true", help="restore the previous magnet handler")
     args = parser.parse_args()
 
-    from .protocol import register_magnet_handler, submit_magnet, unregister_magnet_handler, write_handler_error
+    from apokalypse.protocol import (
+        register_magnet_handler,
+        submit_magnet,
+        unregister_magnet_handler,
+        write_handler_error,
+    )
 
     if args.register_magnet:
         print(register_magnet_handler())
