@@ -82,7 +82,15 @@ def run() -> None:
         browser_timer.daemon = True
         browser_timer.start()
 
-    config = uvicorn.Config(app, host=args.host, port=args.port, loop="asyncio", http="h11")
+    config = uvicorn.Config(
+        app,
+        host=args.host,
+        port=args.port,
+        loop="asyncio",
+        http="h11",
+        log_config=None,
+        access_log=False,
+    )
     server = uvicorn.Server(config)
     tray_icon = None
     should_show_tray = sys.platform == "win32" and not args.no_tray and (args.tray or getattr(sys, "frozen", False))
