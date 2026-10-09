@@ -135,7 +135,7 @@ async function loadMagnetHandler() {
   try {
     const integration = await api("/api/integration/magnet"); const button = $("#magnet-handler-toggle");
     button.dataset.registered = String(integration.registered); button.textContent = integration.registered ? "Disable" : "Enable";
-    button.disabled = !integration.supported; $("#magnet-handler-status").textContent = !integration.supported ? "Available on Windows" : integration.registered ? "Registered for this Windows account" : "Magnet links currently use another application";
+    button.disabled = !integration.supported; $("#magnet-handler-status").textContent = !integration.supported ? "Available on Windows" : integration.registered ? "Registered for this Windows account · restart browsers showing an old app name" : "Magnet links currently use another application";
   } catch (error) { $("#magnet-handler-status").textContent = error.message; }
 }
 async function toggleMagnetHandler() {

@@ -35,7 +35,8 @@ port `6881` by default and can be changed in Settings.
 On Windows, open **Settings → Browser integration** and enable the magnet handler. Browsers may show a
 one-time confirmation before opening BT Apokalypse. If the client is not running when a magnet link is
 clicked, the handler starts it in the background and then adds the torrent. The setting is reversible
-and restores the previous per-user magnet handler when one was present.
+and restores the previous per-user magnet handler when one was present. Fully restart browsers that
+still show the name of an older torrent client, then choose BT Apokalypse once and allow future links.
 
 The same integration can be managed from PowerShell:
 
