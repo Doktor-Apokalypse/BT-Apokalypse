@@ -11,6 +11,8 @@ requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",
   "libtorrent>=2.0.11,<3",
+  "Pillow>=10,<13",
+  "pystray>=0.19,<1",
   "python-multipart>=0.0.20,<1",
   "uvicorn[standard]>=0.34,<1",
 ]

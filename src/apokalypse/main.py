@@ -16,6 +16,8 @@ def run() -> None:
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--open-browser", action="store_true", help="open the WebUI after startup")
     parser.add_argument("--no-browser", action="store_true", help="do not open the WebUI after startup")
+    parser.add_argument("--tray", action="store_true", help="show a Windows notification-area icon")
+    parser.add_argument("--no-tray", action="store_true", help="do not show a notification-area icon")
     parser.add_argument("--magnet", help="submit a magnet URI to the local client")
     parser.add_argument("--register-magnet", action="store_true", help="register as the Windows magnet handler")
     parser.add_argument("--unregister-magnet", action="store_true", help="restore the previous magnet handler")
@@ -48,7 +50,8 @@ def run() -> None:
                 status = torrent_engine.session_status()
                 if not status["libtorrent_version"]:
                     raise RuntimeError("libtorrent failed to initialize")
-                if not STATIC_DIR.joinpath("logo.png").is_file():
+                required_assets = ("logo.png", "favicon-32.ico", "favicon-64.ico", "tray-icon.ico")
+                if not all(STATIC_DIR.joinpath(asset).is_file() for asset in required_assets):
                     raise RuntimeError("WebUI static assets are missing")
             finally:
                 torrent_engine.close()
@@ -79,7 +82,24 @@ def run() -> None:
         browser_timer.daemon = True
         browser_timer.start()
 
-    uvicorn.run(app, host=args.host, port=args.port, loop="asyncio", http="h11")
+    config = uvicorn.Config(app, host=args.host, port=args.port, loop="asyncio", http="h11")
+    server = uvicorn.Server(config)
+    tray_icon = None
+    should_show_tray = sys.platform == "win32" and not args.no_tray and (args.tray or getattr(sys, "frozen", False))
+    if should_show_tray:
+        try:
+            from apokalypse.tray import TrayIcon
+
+            tray_icon = TrayIcon(web_url, lambda: setattr(server, "should_exit", True))
+            tray_icon.start()
+        except Exception as exc:
+            write_handler_error(RuntimeError(f"Could not start the task tray icon: {exc}"))
+
+    try:
+        server.run()
+    finally:
+        if tray_icon is not None:
+            tray_icon.stop()
 
 
 if __name__ == "__main__":

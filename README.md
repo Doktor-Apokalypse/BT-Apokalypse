@@ -17,6 +17,7 @@ BT Apokalypse is a self-hosted BitTorrent client with a browser interface. Its t
 - PeerGuardian, eMule, CIDR, IP-range, and single-IP blocklist imports from a file or URL
 - Server-side folder browser, including Windows drive selection
 - Windows `magnet:` protocol integration for links clicked in Chrome, Edge, Firefox, and other browsers
+- Windows task-tray controls for reopening the WebUI or shutting down the background client
 
 ## Run it
 
@@ -37,6 +38,8 @@ one-time confirmation before opening BT Apokalypse. If the client is not running
 clicked, the handler starts it in the background and then adds the torrent. The setting is reversible
 and restores the previous per-user magnet handler when one was present. Fully restart browsers that
 still show the name of an older torrent client, then choose BT Apokalypse once and allow future links.
+The packaged application remains available in the Windows notification area while it is running. Use
+**Open WebUI** to reopen the browser interface or **Exit BT Apokalypse** to shut down the client cleanly.
 
 The same integration can be managed from PowerShell:
 

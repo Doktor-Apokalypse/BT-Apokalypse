@@ -11,6 +11,8 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
         assert "BT Apokalypse" in page.text
         assert "BT APOKALYPSE" in page.text
         assert '/static/logo.png' in page.text
+        assert '/static/favicon-32.ico' in page.text
+        assert '/static/favicon-64.ico' in page.text
         assert client.get("/static/logo.png").headers["content-type"] == "image/png"
 
         status = client.get("/api/status").json()
