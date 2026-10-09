@@ -67,7 +67,7 @@ extension than unpacking a one-file executable on every launch. The optional ins
 
 ```powershell
 python -m pip install -e ".[dev]"
-.\build-windows.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
 Build outputs:
