@@ -25,14 +25,22 @@ def _pythonw_path() -> Path:
     return candidate if candidate.exists() else Path(sys.executable)
 
 
-def handler_command() -> str:
+def _packaged_executable() -> Path | None:
     if getattr(sys, "frozen", False):
-        return f'"{Path(sys.executable)}" --magnet "%1"'
+        return Path(sys.executable)
+    candidate = Path(__file__).resolve().parents[2] / "dist" / "BT Apokalypse" / "BT Apokalypse.exe"
+    return candidate if candidate.is_file() else None
+
+
+def handler_command() -> str:
+    packaged_executable = _packaged_executable()
+    if packaged_executable:
+        return f'"{packaged_executable}" --magnet "%1"'
     return f'"{_pythonw_path()}" -m apokalypse.main --magnet "%1"'
 
 
 def _application_executable() -> Path:
-    return Path(sys.executable) if getattr(sys, "frozen", False) else _pythonw_path()
+    return _packaged_executable() or _pythonw_path()
 
 
 def _notify_association_changed() -> None:

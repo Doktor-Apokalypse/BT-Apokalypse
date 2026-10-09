@@ -34,6 +34,7 @@ application = EXE(
     strip=False,
     upx=True,
     console=False,
+    version=str(project_root / "packaging" / "version_info.txt"),
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -20,10 +20,19 @@ def test_submit_magnet_rejects_other_protocols() -> None:
         protocol.submit_magnet("https://example.com/file.torrent")
 
 
-def test_handler_command_passes_the_clicked_uri() -> None:
+def test_handler_command_passes_the_clicked_uri(monkeypatch) -> None:
+    monkeypatch.setattr(protocol, "_packaged_executable", lambda: None)
     command = protocol.handler_command()
     assert "-m apokalypse.main --magnet" in command
     assert '"%1"' in command
+
+
+def test_development_handler_prefers_branded_package(monkeypatch, tmp_path) -> None:
+    executable = tmp_path / "BT Apokalypse.exe"
+    executable.touch()
+    monkeypatch.setattr(protocol, "_packaged_executable", lambda: executable)
+
+    assert protocol.handler_command() == f'"{executable}" --magnet "%1"'
 
 
 def test_frozen_handler_uses_the_packaged_executable(monkeypatch) -> None:
