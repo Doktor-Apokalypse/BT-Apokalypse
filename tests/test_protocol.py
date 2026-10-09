@@ -24,3 +24,13 @@ def test_handler_command_passes_the_clicked_uri() -> None:
     command = protocol.handler_command()
     assert "-m apokalypse.main --magnet" in command
     assert '"%1"' in command
+
+
+def test_frozen_handler_uses_the_packaged_executable(monkeypatch) -> None:
+    monkeypatch.setattr(protocol.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(protocol.sys, "executable", r"C:\Program Files\BT Apokalypse\BT Apokalypse.exe")
+
+    command = protocol.handler_command()
+
+    assert command.startswith('"C:\\Program Files\\BT Apokalypse\\BT Apokalypse.exe"')
+    assert '--magnet "%1"' in command

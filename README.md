@@ -60,4 +60,24 @@ pytest
 Interactive API documentation is available at <http://127.0.0.1:8080/docs>. The REST API exposes
 torrents, files, peers, trackers, session settings, filesystem browsing, and blocklist management.
 
+## Build the Windows application
+
+The Windows release uses a PyInstaller one-folder bundle. This is more reliable for libtorrent's native
+extension than unpacking a one-file executable on every launch. The optional installer uses Inno Setup 6.
+
+```powershell
+python -m pip install -e ".[dev]"
+.\build-windows.ps1
+```
+
+Build outputs:
+
+- `dist\BT Apokalypse\BT Apokalypse.exe` — portable standalone application folder
+- `release\BT-Apokalypse-Setup-0.1.0.exe` — installer, when Inno Setup 6 is installed
+
+The installer installs per-user without administrator access, creates Start Menu shortcuts, offers a
+desktop shortcut, and can register the `magnet:` protocol. Installed application data is kept in
+`%LOCALAPPDATA%\BT Apokalypse`, separate from the program files. Run the build on Windows x64 to produce
+the Windows x64 release.
+
 Use BitTorrent only for content you are legally allowed to download and share.

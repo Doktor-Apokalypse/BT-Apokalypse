@@ -22,6 +22,8 @@ def _pythonw_path() -> Path:
 
 
 def handler_command() -> str:
+    if getattr(sys, "frozen", False):
+        return f'"{Path(sys.executable)}" --magnet "%1"'
     return f'"{_pythonw_path()}" -m apokalypse.main --magnet "%1"'
 
 
@@ -135,10 +137,14 @@ def submit_magnet(magnet: str, api_url: str = "http://127.0.0.1:8080") -> None:
     except (OSError, urllib.error.URLError):
         pass
 
-    pythonw = _pythonw_path()
     creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    command = (
+        [sys.executable, "--no-browser"]
+        if getattr(sys, "frozen", False)
+        else [str(_pythonw_path()), "-m", "apokalypse.main", "--no-browser"]
+    )
     subprocess.Popen(
-        [str(pythonw), "-m", "apokalypse.main"],
+        command,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

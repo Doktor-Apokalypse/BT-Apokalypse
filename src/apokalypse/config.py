@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from threading import RLock
@@ -10,7 +11,13 @@ from typing import Any
 
 def default_data_dir() -> Path:
     configured = os.environ.get("APOKALYPSE_DATA_DIR")
-    return Path(configured).expanduser().resolve() if configured else (Path.cwd() / "data").resolve()
+    if configured:
+        return Path(configured).expanduser().resolve()
+    if os.name == "nt" and getattr(sys, "frozen", False):
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            return (Path(local_app_data) / "BT Apokalypse").resolve()
+    return (Path.cwd() / "data").resolve()
 
 
 @dataclass(slots=True)
@@ -86,4 +93,3 @@ class JsonStore:
 
     def save_block_rules(self, rules: list[dict[str, str]]) -> None:
         self._write_json("blocklist.json", rules)
-
