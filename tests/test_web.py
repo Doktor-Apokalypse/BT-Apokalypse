@@ -9,6 +9,8 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
         page = client.get("/")
         assert page.status_code == 200
         assert "BT Apokalypse" in page.text
+        assert '/static/logo.png' in page.text
+        assert client.get("/static/logo.png").headers["content-type"] == "image/png"
 
         status = client.get("/api/status").json()
         assert status["torrents"] == 0
