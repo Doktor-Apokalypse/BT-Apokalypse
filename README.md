@@ -10,6 +10,7 @@ BT Apokalypse is a self-hosted BitTorrent client with a browser interface. Its t
 - Normal or sequential piece downloading
 - Per-torrent file selection and priorities
 - Pause, resume, recheck, reannounce, queue ordering, speed limits, and connection limits
+- Configurable maximum numbers of active downloads and active seeds
 - A separate download folder for each torrent
 - Optional automatic moves to a completed folder while continuing to seed
 - Persistent fast-resume data and automatic restoration after restarting

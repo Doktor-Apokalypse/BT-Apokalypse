@@ -73,6 +73,10 @@ class TorrentEngine:
             "download_rate_limit": self.settings.download_limit_kib * 1024,
             "upload_rate_limit": self.settings.upload_limit_kib * 1024,
             "connections_limit": self.settings.max_connections,
+            "active_downloads": self.settings.max_active_downloads,
+            "active_seeds": self.settings.max_active_seeds,
+            "active_limit": self.settings.max_active_downloads + self.settings.max_active_seeds,
+            "dont_count_slow_torrents": False,
             "alert_mask": int(lt.alert.category_t.all_categories),
         }
         return lt.session(settings)
@@ -453,6 +457,10 @@ class TorrentEngine:
                 "download_rate_limit": self.settings.download_limit_kib * 1024,
                 "upload_rate_limit": self.settings.upload_limit_kib * 1024,
                 "connections_limit": self.settings.max_connections,
+                "active_downloads": self.settings.max_active_downloads,
+                "active_seeds": self.settings.max_active_seeds,
+                "active_limit": self.settings.max_active_downloads + self.settings.max_active_seeds,
+                "dont_count_slow_torrents": False,
             }
         )
         for handle in self._handles.values():

@@ -160,7 +160,7 @@ async function toggleMagnetHandler() {
 async function saveSettings(event) {
   event.preventDefault(); const form = new FormData(event.target); const payload = {};
   ["download_dir","completed_dir"].forEach(key => payload[key] = form.get(key));
-  ["listen_port","max_connections","download_limit_kib","upload_limit_kib"].forEach(key => payload[key] = Number(form.get(key)));
+  ["listen_port","max_connections","max_active_downloads","max_active_seeds","download_limit_kib","upload_limit_kib"].forEach(key => payload[key] = Number(form.get(key)));
   ["move_completed","enable_dht","enable_pex","enable_lsd","enable_upnp","enable_natpmp"].forEach(key => payload[key] = event.target.elements.namedItem(key).checked);
   payload.auto_start = form.get("auto_start") === "true";
   try { await api("/api/settings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); $("#settings-dialog").close(); toast("Settings saved"); await refresh(); }

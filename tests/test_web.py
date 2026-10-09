@@ -14,6 +14,8 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
         assert '/static/logo.png' in page.text
         assert '/static/favicon-32.ico' in page.text
         assert '/static/favicon-64.ico' in page.text
+        assert 'name="max_active_downloads"' in page.text
+        assert 'name="max_active_seeds"' in page.text
         assert client.get("/static/logo.png").headers["content-type"] == "image/png"
 
         status = client.get("/api/status").json()
@@ -22,6 +24,8 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
 
         settings = client.get("/api/settings").json()
         assert settings["enable_dht"] is True
+        assert settings["max_active_downloads"] == 3
+        assert settings["max_active_seeds"] == 5
 
         imported = client.post("/api/blocklist/text", json={"text": "203.0.113.1"}).json()
         assert imported == {"added": 1, "total": 1}

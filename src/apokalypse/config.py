@@ -35,6 +35,8 @@ class AppSettings:
     download_limit_kib: int = 0
     upload_limit_kib: int = 0
     max_connections: int = 500
+    max_active_downloads: int = 3
+    max_active_seeds: int = 5
 
     def normalized(self) -> "AppSettings":
         self.download_dir = str(Path(self.download_dir).expanduser().resolve())
@@ -44,6 +46,8 @@ class AppSettings:
         self.download_limit_kib = max(0, int(self.download_limit_kib))
         self.upload_limit_kib = max(0, int(self.upload_limit_kib))
         self.max_connections = max(10, int(self.max_connections))
+        self.max_active_downloads = min(1000, max(1, int(self.max_active_downloads)))
+        self.max_active_seeds = min(1000, max(1, int(self.max_active_seeds)))
         return self
 
 

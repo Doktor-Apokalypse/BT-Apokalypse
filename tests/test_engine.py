@@ -34,6 +34,15 @@ def test_add_manage_and_remove_torrent(tmp_path: Path) -> None:
         engine.update_torrent(torrent_id, {"sequential": False, "download_limit_kib": 100})
         assert engine.get_torrent(torrent_id)["sequential"] is False
 
+        settings = engine.update_settings({"max_active_downloads": 7, "max_active_seeds": 11})
+        session_settings = engine.session.get_settings()
+        assert settings["max_active_downloads"] == 7
+        assert settings["max_active_seeds"] == 11
+        assert session_settings["active_downloads"] == 7
+        assert session_settings["active_seeds"] == 11
+        assert session_settings["active_limit"] == 18
+        assert session_settings["dont_count_slow_torrents"] is False
+
         engine.remove(torrent_id)
         assert engine.list_torrents() == []
     finally:
