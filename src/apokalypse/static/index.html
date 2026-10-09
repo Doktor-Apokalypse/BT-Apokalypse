@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BT Apokalypse</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="BT Apokalypse home">
+        <span class="brand-mark">A</span>
+        <span><strong>APOKALYPSE</strong><small>BITTORRENT CLIENT</small></span>
+      </a>
+      <nav class="filters" aria-label="Torrent filters">
+        <button class="filter active" data-filter="all"><span class="dot all"></span>All torrents <b id="count-all">0</b></button>
+        <button class="filter" data-filter="downloading"><span class="dot down"></span>Downloading <b id="count-downloading">0</b></button>
+        <button class="filter" data-filter="seeding"><span class="dot seed"></span>Seeding <b id="count-seeding">0</b></button>
+        <button class="filter" data-filter="completed"><span class="dot done"></span>Completed <b id="count-completed">0</b></button>
+        <button class="filter" data-filter="paused"><span class="dot pause"></span>Paused <b id="count-paused">0</b></button>
+        <button class="filter" data-filter="error"><span class="dot error"></span>Errors <b id="count-error">0</b></button>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="network-card">
+        <div><span class="status-light" id="network-light"></span><strong id="network-label">Connecting</strong></div>
+        <p><span id="dht-count">0</span> DHT nodes · <span id="connection-count">0</span> peers</p>
+        <p class="muted">Port <span id="listen-port">—</span></p>
+      </div>
+      <button class="side-link" id="blocklist-open">Shield &amp; blocklist <span id="block-count">0</span></button>
+      <button class="side-link" id="settings-open">Settings <span>⌘</span></button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="speed-group">
+          <div class="speed down"><span>↓</span><div><small>DOWNLOAD</small><strong id="global-down">0 B/s</strong></div></div>
+          <div class="speed up"><span>↑</span><div><small>UPLOAD</small><strong id="global-up">0 B/s</strong></div></div>
+        </div>
+        <div class="top-actions">
+          <label class="search"><span>⌕</span><input id="search" type="search" placeholder="Search torrents"></label>
+          <button class="primary" id="add-open"><span>＋</span> Add torrent</button>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="title-row">
+          <div><p class="eyebrow">TRANSFER QUEUE</p><h1 id="view-title">All torrents</h1></div>
+          <div class="bulk-actions">
+            <button id="resume-selected" title="Resume selected">▶</button>
+            <button id="pause-selected" title="Pause selected">Ⅱ</button>
+            <button id="remove-selected" title="Remove selected">⌫</button>
+          </div>
+        </div>
+
+        <div class="torrent-table-wrap">
+          <table class="torrent-table">
+            <thead><tr><th class="check"><input type="checkbox" id="select-all" aria-label="Select all"></th><th>Name</th><th>Size</th><th>Progress</th><th>Down</th><th>Up</th><th>Peers</th><th>ETA</th><th></th></tr></thead>
+            <tbody id="torrent-list"></tbody>
+          </table>
+          <div class="empty" id="empty-state">
+            <div class="empty-symbol">↓</div>
+            <h2>Your queue is quiet</h2>
+            <p>Add a .torrent file or paste a magnet link to begin.</p>
+            <button class="primary" id="empty-add">Add your first torrent</button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer"><span id="footer-version">BT Apokalypse</span><span><i class="status-light"></i> Engine online</span></footer>
+    </main>
+  </div>
+
+  <dialog id="add-dialog" class="modal">
+    <form id="add-form">
+      <header><div><p class="eyebrow">NEW TRANSFER</p><h2>Add a torrent</h2></div><button type="button" class="close" data-close>×</button></header>
+      <div class="tabs"><button type="button" class="tab active" data-add-tab="magnet">Magnet link</button><button type="button" class="tab" data-add-tab="file">Torrent file</button></div>
+      <section class="tab-panel" id="magnet-panel">
+        <label>Magnet URI<textarea id="magnet-input" rows="4" placeholder="magnet:?xt=urn:btih:…"></textarea></label>
+      </section>
+      <section class="tab-panel hidden" id="file-panel">
+        <label class="drop-zone" id="drop-zone"><input id="torrent-file" type="file" accept=".torrent,application/x-bittorrent"><span class="drop-icon">⇧</span><strong>Choose a .torrent file</strong><small>or drop it here</small></label>
+      </section>
+      <div class="two-col">
+        <label>Download folder<div class="input-button"><input id="add-save-path" required><button type="button" class="browse" data-browse="add-save-path">Browse</button></div></label>
+        <label>Completed folder <small>(optional)</small><div class="input-button"><input id="add-completed-path"><button type="button" class="browse" data-browse="add-completed-path">Browse</button></div></label>
+      </div>
+      <div class="toggle-row"><label><input id="add-sequential" type="checkbox"><span></span>Sequential download</label><label><input id="add-paused" type="checkbox"><span></span>Add paused</label></div>
+      <footer><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="primary" id="add-submit">Add torrent</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="details-dialog" class="modal wide">
+    <div class="details-head"><div><p class="eyebrow" id="details-state">TORRENT</p><h2 id="details-name">Details</h2></div><button class="close" data-close>×</button></div>
+    <div class="detail-summary" id="detail-summary"></div>
+    <div class="tabs"><button class="tab active" data-detail-tab="files">Files</button><button class="tab" data-detail-tab="peers">Peers</button><button class="tab" data-detail-tab="trackers">Trackers</button><button class="tab" data-detail-tab="options">Options</button></div>
+    <div id="detail-content" class="detail-content"></div>
+  </dialog>
+
+  <dialog id="settings-dialog" class="modal">
+    <form id="settings-form">
+      <header><div><p class="eyebrow">CLIENT</p><h2>Settings</h2></div><button type="button" class="close" data-close>×</button></header>
+      <div class="form-scroll">
+        <h3>Folders</h3>
+        <label>Default download folder<div class="input-button"><input name="download_dir" required><button type="button" class="browse" data-browse="settings-download">Browse</button></div></label>
+        <label>Move completed torrents to<div class="input-button"><input name="completed_dir" id="settings-completed"><button type="button" class="browse" data-browse="settings-completed">Browse</button></div></label>
+        <label class="checkline"><input name="move_completed" type="checkbox"> Move completed downloads automatically</label>
+        <h3>Network</h3>
+        <div class="three-col"><label>Listen port<input name="listen_port" type="number" min="1" max="65535"></label><label>Max connections<input name="max_connections" type="number" min="10"></label><label>Start torrents<select name="auto_start"><option value="true">Automatically</option><option value="false">Paused</option></select></label></div>
+        <div class="toggle-grid"><label><input name="enable_dht" type="checkbox"> DHT</label><label><input name="enable_pex" type="checkbox"> Peer exchange</label><label><input name="enable_lsd" type="checkbox"> Local discovery</label><label><input name="enable_upnp" type="checkbox"> UPnP</label><label><input name="enable_natpmp" type="checkbox"> NAT-PMP</label></div>
+        <h3>Speed limits <small>(0 is unlimited)</small></h3>
+        <div class="two-col"><label>Download KiB/s<input name="download_limit_kib" type="number" min="0"></label><label>Upload KiB/s<input name="upload_limit_kib" type="number" min="0"></label></div>
+      </div>
+      <footer><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="primary">Save settings</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="blocklist-dialog" class="modal">
+    <div class="dialog-pad">
+      <header><div><p class="eyebrow">NETWORK SHIELD</p><h2>IP blocklist</h2></div><button class="close" data-close>×</button></header>
+      <p class="help">Import PeerGuardian, eMule, CIDR, IP range, or one-IP-per-line lists. Rules are applied to every torrent and persist across restarts.</p>
+      <div class="stat-card"><strong id="block-total">0</strong><span>active IP rules</span></div>
+      <form id="ban-form" class="inline-form"><input id="ban-ip" placeholder="Ban an IPv4 address"><button class="secondary">Ban IP</button></form>
+      <form id="block-url-form" class="inline-form"><input id="block-url" type="url" placeholder="https://example.com/blocklist.txt"><button class="secondary">Import URL</button></form>
+      <label class="drop-zone small"><input id="block-file" type="file" accept=".txt,.dat,.p2p"><strong>Import a blocklist file</strong><small>up to 50 MiB</small></label>
+      <div id="block-rules" class="rule-list"></div>
+      <footer><button id="clear-blocklist" class="danger">Clear blocklist</button><button class="primary" data-close>Done</button></footer>
+    </div>
+  </dialog>
+
+  <dialog id="folder-dialog" class="modal folder-modal">
+    <div class="dialog-pad"><header><div><p class="eyebrow">SERVER FILESYSTEM</p><h2>Choose a folder</h2></div><button class="close" data-close>×</button></header>
+      <div class="folder-path"><button id="folder-up">↑</button><input id="folder-current"></div>
+      <div class="folder-roots" id="folder-roots"></div><div class="folder-list" id="folder-list"></div>
+      <footer><button class="secondary" data-close>Cancel</button><button class="primary" id="folder-select">Use this folder</button></footer>
+    </div>
+  </dialog>
+
+  <div id="toast-stack" aria-live="polite"></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

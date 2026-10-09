@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import libtorrent as lt
+
+from apokalypse.config import JsonStore
+from apokalypse.engine import TorrentEngine
+
+
+def make_torrent(folder: Path) -> bytes:
+    source = folder / "sample.txt"
+    source.write_text("BT Apokalypse test payload", encoding="utf-8")
+    storage = lt.file_storage()
+    lt.add_files(storage, str(source))
+    creator = lt.create_torrent(storage)
+    creator.add_tracker("udp://tracker.example:80/announce")
+    lt.set_piece_hashes(creator, str(folder))
+    return bytes(lt.bencode(creator.generate()))
+
+
+def test_add_manage_and_remove_torrent(tmp_path: Path) -> None:
+    engine = TorrentEngine(JsonStore(tmp_path / "state"), start_worker=False)
+    try:
+        result = engine.add_torrent_bytes(make_torrent(tmp_path), str(tmp_path / "downloads"), sequential=True)
+        torrent_id = result["id"]
+
+        assert result["sequential"] is True
+        assert engine.list_torrents()[0]["id"] == torrent_id
+        assert engine.files(torrent_id)[0]["path"].endswith("sample.txt")
+        assert engine.trackers(torrent_id)[0]["url"].startswith("udp://")
+
+        engine.action(torrent_id, "pause")
+        engine.update_torrent(torrent_id, {"sequential": False, "download_limit_kib": 100})
+        assert engine.get_torrent(torrent_id)["sequential"] is False
+
+        engine.remove(torrent_id)
+        assert engine.list_torrents() == []
+    finally:
+        engine.close()
+
+
+def test_block_rules_are_persistent(tmp_path: Path) -> None:
+    store = JsonStore(tmp_path / "state")
+    engine = TorrentEngine(store, start_worker=False)
+    try:
+        assert engine.add_blocklist("203.0.113.0/24") == {"added": 1, "total": 1}
+        assert engine.ban_ip("198.51.100.4") == {"added": 1, "total": 2}
+    finally:
+        engine.close()
+
+    assert len(store.load_block_rules()) == 2
