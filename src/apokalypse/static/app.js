@@ -1,4 +1,4 @@
-const state = { torrents: [], status: {}, settings: {}, filter: "all", search: "", sortKey: "added_at", sortDirection: "desc", selected: new Set(), detailId: null, detailTab: "files", addTab: "magnet", folderTarget: null, folderParent: null };
+const state = { torrents: [], status: {}, settings: {}, filter: "all", search: "", sortKey: "added_at", sortDirection: "desc", selected: new Set(), detailId: null, detailTab: "files", addTab: "magnet", folderTarget: null, folderParent: null, removeDeleteFiles: false };
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -83,12 +83,34 @@ async function actionSelected(action) {
   try { await Promise.all([...state.selected].map(id => api(`/api/torrents/${id}/action`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action})}))); await refresh(); }
   catch (error) { toast(error.message, true); }
 }
-async function removeSelected() {
+function closeRemoveMenu() {
+  $("#remove-menu").hidden = true;
+  $("#remove-selected").setAttribute("aria-expanded", "false");
+}
+function toggleRemoveMenu() {
   if (!state.selected.size) return toast("Select at least one torrent", true);
-  if (!confirm("Remove the selected torrents from the client?")) return;
-  const deleteFiles = confirm("Also delete their downloaded files?\n\nCancel keeps the downloaded data.");
-  try { await Promise.all([...state.selected].map(id => api(`/api/torrents/${id}?delete_files=${deleteFiles}`, {method:"DELETE"}))); state.selected.clear(); await refresh(); }
-  catch (error) { toast(error.message, true); }
+  const menu = $("#remove-menu"); menu.hidden = !menu.hidden;
+  $("#remove-selected").setAttribute("aria-expanded", String(!menu.hidden));
+}
+function requestRemove(deleteFiles) {
+  closeRemoveMenu();
+  if (!state.selected.size) return toast("Select at least one torrent", true);
+  state.removeDeleteFiles = deleteFiles;
+  const count = state.selected.size; const noun = count === 1 ? "torrent" : "torrents";
+  $("#remove-confirm-title").textContent = deleteFiles ? `Remove and delete ${count} ${noun}?` : `Remove ${count} ${noun}?`;
+  $("#remove-confirm-message").textContent = deleteFiles
+    ? `The selected ${noun} will be removed from BT Apokalypse and all downloaded files will be permanently deleted. This cannot be undone.`
+    : `The selected ${noun} will be removed from BT Apokalypse. Downloaded files will remain on disk.`;
+  $("#remove-confirm-action").textContent = deleteFiles ? "Remove and delete files" : "Remove torrent";
+  show($("#remove-confirm-dialog"));
+}
+async function removeSelected() {
+  const button = $("#remove-confirm-action"); button.disabled = true;
+  try {
+    await Promise.all([...state.selected].map(id => api(`/api/torrents/${id}?delete_files=${state.removeDeleteFiles}`, {method:"DELETE"})));
+    state.selected.clear(); $("#remove-confirm-dialog").close(); toast("Torrent removal complete"); await refresh();
+  } catch (error) { toast(error.message, true); }
+  finally { button.disabled = false; }
 }
 
 async function openAdd() {
@@ -182,6 +204,9 @@ function chooseFolder() { const path = $("#folder-current").value; const target 
 
 document.addEventListener("click", async event => {
   const close = event.target.closest("[data-close]"); if (close) return closeDialog(close);
+  const removeChoice = event.target.closest("[data-remove-files]"); if (removeChoice) return requestRemove(removeChoice.dataset.removeFiles === "true");
+  const removeToggle = event.target.closest("#remove-selected"); if (removeToggle) return toggleRemoveMenu();
+  if (!event.target.closest(".remove-menu-wrap")) closeRemoveMenu();
   const filter = event.target.closest(".filter"); if (filter) { state.filter = filter.dataset.filter; $$(".filter").forEach(f => f.classList.toggle("active",f===filter)); $("#view-title").textContent = filter.textContent.replace(/\d+$/,"").trim(); return render(); }
   const sortHeader = event.target.closest("[data-sort]"); if (sortHeader) { const key=sortHeader.dataset.sort; if (state.sortKey===key) state.sortDirection=state.sortDirection==="asc"?"desc":"asc"; else { state.sortKey=key; state.sortDirection=key==="name"?"asc":"desc"; } saveSort(); return render(); }
   const browseButton = event.target.closest("[data-browse]"); if (browseButton) return browse(browseButton.dataset.browse);
@@ -194,7 +219,9 @@ document.addEventListener("click", async event => {
 
 $("#add-open").onclick = $("#empty-add").onclick = openAdd; $("#add-form").onsubmit = submitAdd; $("#settings-open").onclick = openSettings; $("#settings-form").onsubmit = saveSettings; $("#blocklist-open").onclick = openBlocklist;
 $("#magnet-handler-toggle").onclick = toggleMagnetHandler;
-$("#search").oninput = event => { state.search = event.target.value; render(); }; $("#resume-selected").onclick = () => actionSelected("resume"); $("#pause-selected").onclick = () => actionSelected("pause"); $("#remove-selected").onclick = removeSelected;
+$("#search").oninput = event => { state.search = event.target.value; render(); }; $("#resume-selected").onclick = () => actionSelected("resume"); $("#pause-selected").onclick = () => actionSelected("pause");
+$("#remove-confirm-action").onclick = removeSelected;
+document.addEventListener("keydown", event => { if (event.key === "Escape") closeRemoveMenu(); });
 $("#sort-select").onchange = event => { state.sortKey=event.target.value; state.sortDirection=state.sortKey==="name"?"asc":"desc"; saveSort(); render(); }; $("#sort-direction").onclick = () => { state.sortDirection=state.sortDirection==="asc"?"desc":"asc"; saveSort(); render(); };
 $("#select-all").onchange = event => { state.torrents.filter(matchesFilter).forEach(t => event.target.checked ? state.selected.add(t.id) : state.selected.delete(t.id)); render(); };
 $("#torrent-list").addEventListener("dblclick", event => { const row=event.target.closest("tr"); if(row) api(`/api/torrents/${row.dataset.id}/action`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"resume"})}).then(refresh); });

@@ -54,7 +54,13 @@
             <div class="bulk-actions">
               <button id="resume-selected" title="Resume selected">▶</button>
               <button id="pause-selected" title="Pause selected">Ⅱ</button>
-              <button id="remove-selected" title="Remove selected">⌫</button>
+              <div class="remove-menu-wrap">
+                <button id="remove-selected" title="Remove selected" aria-haspopup="menu" aria-expanded="false">⌫</button>
+                <div id="remove-menu" class="remove-menu" role="menu" hidden>
+                  <button type="button" role="menuitem" data-remove-files="false"><strong>Remove torrent</strong><small>Keep downloaded files</small></button>
+                  <button type="button" role="menuitem" class="delete-files" data-remove-files="true"><strong>Remove torrent and delete files</strong><small>Permanently delete downloaded data</small></button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -144,6 +150,14 @@
       <div class="folder-path"><button id="folder-up">↑</button><input id="folder-current"></div>
       <div class="folder-roots" id="folder-roots"></div><div class="folder-list" id="folder-list"></div>
       <footer><button class="secondary" data-close>Cancel</button><button class="primary" id="folder-select">Use this folder</button></footer>
+    </div>
+  </dialog>
+
+  <dialog id="remove-confirm-dialog" class="modal confirm-modal">
+    <div class="dialog-pad">
+      <header><div><p class="eyebrow">CONFIRM REMOVAL</p><h2 id="remove-confirm-title">Remove torrent?</h2></div><button class="close" data-close>×</button></header>
+      <p class="help" id="remove-confirm-message"></p>
+      <footer><button class="secondary" data-close>Cancel</button><button class="danger" id="remove-confirm-action">Remove torrent</button></footer>
     </div>
   </dialog>
 

@@ -16,6 +16,9 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
         assert '/static/favicon-64.ico' in page.text
         assert 'name="max_active_downloads"' in page.text
         assert 'name="max_active_seeds"' in page.text
+        assert 'data-remove-files="false"' in page.text
+        assert 'data-remove-files="true"' in page.text
+        assert 'id="remove-confirm-dialog"' in page.text
         assert client.get("/static/logo.png").headers["content-type"] == "image/png"
 
         status = client.get("/api/status").json()
