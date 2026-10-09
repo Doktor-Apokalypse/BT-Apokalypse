@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -39,6 +41,21 @@ def api_error(exc: Exception) -> HTTPException:
     if isinstance(exc, ValueError):
         return HTTPException(400, str(exc))
     return HTTPException(500, str(exc))
+
+
+def open_in_file_manager(folder: Path) -> None:
+    """Open a local folder using the operating system's file manager."""
+    if os.name == "nt":
+        os.startfile(str(folder))  # type: ignore[attr-defined]
+        return
+    command = ["open" if sys.platform == "darwin" else "xdg-open", str(folder)]
+    subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+    )
 
 
 class MagnetInput(BaseModel):
@@ -143,6 +160,18 @@ def torrent_action(torrent_id: str, payload: ActionInput, request: Request) -> d
 def update_torrent(torrent_id: str, payload: TorrentUpdate, request: Request) -> dict[str, Any]:
     try:
         return engine(request).update_torrent(torrent_id, payload.model_dump(exclude_none=True))
+    except Exception as exc:
+        raise api_error(exc) from exc
+
+
+@app.post("/api/torrents/{torrent_id}/open-folder")
+def open_torrent_folder(torrent_id: str, request: Request) -> dict[str, str]:
+    try:
+        folder = Path(engine(request).get_torrent(torrent_id)["save_path"]).expanduser().resolve()
+        if not folder.is_dir():
+            raise ValueError("The torrent download folder does not exist")
+        open_in_file_manager(folder)
+        return {"path": str(folder)}
     except Exception as exc:
         raise api_error(exc) from exc
 

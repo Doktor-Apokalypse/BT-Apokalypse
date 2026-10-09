@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from apokalypse import web
 from apokalypse.web import app
 
 
@@ -24,3 +25,20 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
 
         imported = client.post("/api/blocklist/text", json={"text": "203.0.113.1"}).json()
         assert imported == {"added": 1, "total": 1}
+
+
+def test_open_torrent_download_folder(tmp_path, monkeypatch) -> None:
+    class FakeEngine:
+        @staticmethod
+        def get_torrent(_torrent_id: str) -> dict[str, str]:
+            return {"save_path": str(tmp_path)}
+
+    opened: list[object] = []
+    monkeypatch.setattr(web, "engine", lambda _request: FakeEngine())
+    monkeypatch.setattr(web, "open_in_file_manager", opened.append)
+    with TestClient(app) as client:
+        response = client.post("/api/torrents/example/open-folder")
+
+    assert response.status_code == 200
+    assert response.json() == {"path": str(tmp_path.resolve())}
+    assert opened == [tmp_path.resolve()]
