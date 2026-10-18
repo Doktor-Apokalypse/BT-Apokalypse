@@ -90,6 +90,16 @@ def test_global_and_individual_tracker_lists(tmp_path: Path) -> None:
         urls = [tracker["url"] for tracker in trackers]
         assert urls.count("https://tracker.two.example/announce") == 1
         assert "udp://tracker.manual.example:6969/announce" in urls
+
+        manual_index = next(
+            tracker["index"]
+            for tracker in trackers
+            if tracker["url"] == "udp://tracker.manual.example:6969/announce"
+        )
+        remaining = engine.remove_tracker(torrent_id, manual_index)
+        assert "udp://tracker.manual.example:6969/announce" not in {
+            tracker["url"] for tracker in remaining
+        }
     finally:
         engine.close()
 

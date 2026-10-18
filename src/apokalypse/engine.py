@@ -413,11 +413,12 @@ class TorrentEngine:
         with self._lock:
             return [
                 {
+                    "index": index,
                     "url": tracker["url"],
                     "tier": tracker.get("tier", 0),
                     "verified": tracker.get("verified", False),
                 }
-                for tracker in self._handle(torrent_id).trackers()
+                for index, tracker in enumerate(self._handle(torrent_id).trackers())
             ]
 
     @staticmethod
@@ -442,6 +443,16 @@ class TorrentEngine:
 
     def add_tracker(self, torrent_id: str, url: str, tier: int = 0) -> list[dict[str, Any]]:
         return self.add_trackers(torrent_id, [url], tier)
+
+    def remove_tracker(self, torrent_id: str, tracker_index: int) -> list[dict[str, Any]]:
+        with self._lock:
+            handle = self._handle(torrent_id)
+            trackers = handle.trackers()
+            if tracker_index < 0 or tracker_index >= len(trackers):
+                raise ValueError("Tracker not found")
+            del trackers[tracker_index]
+            handle.replace_trackers(trackers)
+        return self.trackers(torrent_id)
 
     def session_status(self) -> dict[str, Any]:
         torrents = self.list_torrents()

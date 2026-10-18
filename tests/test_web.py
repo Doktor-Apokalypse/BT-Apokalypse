@@ -24,7 +24,9 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
         assert client.get("/static/logo.png").headers["content-type"] == "image/png"
         script = client.get("/static/app.js")
         assert script.status_code == 200
+        assert script.headers["cache-control"] == "no-cache, max-age=0, must-revalidate"
         assert 'if (state.filter === "completed") return isComplete(torrent);' in script.text
+        assert 'class="danger tracker-remove"' in script.text
 
         status = client.get("/api/status").json()
         assert status["torrents"] == 0

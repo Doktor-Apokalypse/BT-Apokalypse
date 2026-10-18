@@ -31,6 +31,14 @@ app = FastAPI(title="BT Apokalypse", version="0.1.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+@app.middleware("http")
+async def revalidate_webui_assets(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
+    return response
+
+
 def engine(request: Request) -> TorrentEngine:
     return request.app.state.engine
 
@@ -224,6 +232,14 @@ def add_tracker(torrent_id: str, payload: TrackerInput, request: Request) -> lis
     try:
         urls = [*payload.urls, *([payload.url] if payload.url else [])]
         return engine(request).add_trackers(torrent_id, urls, payload.tier)
+    except Exception as exc:
+        raise api_error(exc) from exc
+
+
+@app.delete("/api/torrents/{torrent_id}/trackers/{tracker_index}")
+def remove_tracker(torrent_id: str, tracker_index: int, request: Request) -> list[dict[str, Any]]:
+    try:
+        return engine(request).remove_tracker(torrent_id, tracker_index)
     except Exception as exc:
         raise api_error(exc) from exc
 
