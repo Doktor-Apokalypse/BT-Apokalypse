@@ -1,4 +1,5 @@
 const state = { torrents: [], status: {}, settings: {}, filter: "all", search: "", sortKey: "added_at", sortDirection: "desc", selected: new Set(), detailId: null, detailTab: "files", addTab: "magnet", folderTarget: null, folderParent: null, removeDeleteFiles: false };
+let refreshTimer = null;
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -17,6 +18,7 @@ async function api(path, options = {}) {
   if (!response.ok) {
     let message = response.statusText;
     try { const body = await response.json(); message = body.detail || message; } catch (_) {}
+    if (response.status === 401) showLogin();
     throw new Error(message);
   }
   return response.status === 204 ? null : response.json();
@@ -26,6 +28,11 @@ function toast(message, error = false) {
   $("#toast-stack").append(item); setTimeout(() => item.remove(), 3500);
 }
 function show(dialog) { dialog.showModal(); }
+function showLogin(username = "") {
+  if (username) $("#login-username").value = username;
+  if (!$("#login-dialog").open) $("#login-dialog").showModal();
+  setTimeout(() => $("#login-password").focus(), 0);
+}
 function closeDialog(element) { element.closest("dialog")?.close(); }
 function saveSort() { try { localStorage.setItem("apokalypse-sort", JSON.stringify({key:state.sortKey,direction:state.sortDirection})); } catch (_) {} }
 function restoreSort() { try { const saved=JSON.parse(localStorage.getItem("apokalypse-sort")); if (["added_at","name","total_size","progress","download_rate","upload_rate","peers","eta"].includes(saved?.key)) state.sortKey=saved.key; if (["asc","desc"].includes(saved?.direction)) state.sortDirection=saved.direction; } catch (_) {} }
@@ -166,8 +173,18 @@ async function loadDetail() {
 
 async function openSettings() {
   try {
-    state.settings = await api("/api/settings"); const form = $("#settings-form");
+    const [settings, interfaces] = await Promise.all([api("/api/settings"), api("/api/network/interfaces")]);
+    state.settings = settings; const form = $("#settings-form");
+    const interfaceSelect = $("#bind-interface");
+    interfaceSelect.innerHTML = '<option value="">All interfaces</option>' + interfaces.map(item => {
+      const addresses = item.ipv4.length ? ` · ${item.ipv4.join(", ")}` : "";
+      return `<option value="${escapeHtml(item.id)}" data-name="${escapeHtml(item.name)}">${escapeHtml(item.name)} (${escapeHtml(item.status)})${escapeHtml(addresses)}</option>`;
+    }).join("");
+    if (settings.bind_interface && !interfaces.some(item => item.id === settings.bind_interface)) interfaceSelect.insertAdjacentHTML("beforeend", `<option value="${escapeHtml(settings.bind_interface)}" data-name="${escapeHtml(settings.bind_interface_name)}">${escapeHtml(settings.bind_interface_name || settings.bind_interface)} (unavailable)</option>`);
     Object.entries(state.settings).forEach(([key,value]) => { const field = form.elements.namedItem(key); if (!field) return; if (field.type === "checkbox") field.checked = !!value; else if (key === "tracker_list") field.value = Array.isArray(value) ? value.join("\n") : String(value || ""); else field.value = String(value); });
+    form.elements.namedItem("proxy_password").value = ""; form.elements.namedItem("webui_password").value = "";
+    const tailscale = interfaces.find(item => item.name.toLowerCase().includes("tailscale"));
+    if (tailscale?.ipv4?.length) $("#webui-access-help").textContent = `Localhost always bypasses the password. Tailscale URL after restart: http://${tailscale.ipv4[0]}:${settings.webui_port}. Remote Tailscale clients must sign in.`;
     show($("#settings-dialog")); await loadMagnetHandler();
   } catch (error) { toast(error.message,true); }
 }
@@ -185,13 +202,39 @@ async function toggleMagnetHandler() {
 }
 async function saveSettings(event) {
   event.preventDefault(); const form = new FormData(event.target); const payload = {};
-  ["download_dir","completed_dir"].forEach(key => payload[key] = form.get(key));
-  ["listen_port","max_connections","max_active_downloads","max_active_seeds","download_limit_kib","upload_limit_kib"].forEach(key => payload[key] = Number(form.get(key)));
-  ["move_completed","enable_dht","enable_pex","enable_lsd","enable_upnp","enable_natpmp","add_trackers_to_new_torrents"].forEach(key => payload[key] = event.target.elements.namedItem(key).checked);
+  ["download_dir","completed_dir","encryption_mode","bind_interface","proxy_type","proxy_hostname","proxy_username","proxy_password","webui_access","webui_username","webui_password"].forEach(key => payload[key] = form.get(key));
+  ["listen_port","max_connections","max_active_downloads","max_active_seeds","download_limit_kib","upload_limit_kib","proxy_port","webui_port"].forEach(key => payload[key] = Number(form.get(key)));
+  ["move_completed","randomize_listen_port","enable_dht","enable_pex","enable_lsd","enable_upnp","enable_natpmp","add_trackers_to_new_torrents","anonymous_mode","webui_auth_enabled"].forEach(key => payload[key] = event.target.elements.namedItem(key).checked);
+  payload.bind_interface_name = $("#bind-interface").selectedOptions[0]?.dataset.name || "";
   payload.tracker_list = String(form.get("tracker_list") || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   payload.auto_start = form.get("auto_start") === "true";
-  try { await api("/api/settings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); $("#settings-dialog").close(); toast("Settings saved"); await refresh(); }
+  try { await api("/api/settings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); $("#settings-dialog").close(); toast("Settings saved. Restart BT Apokalypse after changing WebUI access or port."); await refresh(); }
   catch(error){ toast(error.message,true); }
+}
+
+async function initialize() {
+  restoreSort();
+  try {
+    const auth = await api("/api/auth/status");
+    if (auth.required && !auth.authenticated) return showLogin(auth.username);
+    $("#logout-button").classList.toggle("hidden", !auth.required);
+    await refresh();
+    if (!refreshTimer) refreshTimer = setInterval(refresh, 1500);
+  } catch (error) { toast(error.message, true); }
+}
+
+async function submitLogin(event) {
+  event.preventDefault(); $("#login-error").textContent = "";
+  try {
+    await api("/api/auth/login", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:$("#login-username").value,password:$("#login-password").value})});
+    $("#login-password").value = ""; $("#login-dialog").close(); $("#logout-button").classList.remove("hidden");
+    await refresh(); if (!refreshTimer) refreshTimer = setInterval(refresh, 1500);
+  } catch (error) { $("#login-error").textContent = error.message; }
+}
+
+async function logout() {
+  try { await api("/api/auth/session", {method:"DELETE"}); } catch (_) {}
+  if (refreshTimer) clearInterval(refreshTimer); refreshTimer = null; showLogin($("#login-username").value);
 }
 
 async function openBlocklist() { show($("#blocklist-dialog")); await loadBlocklist(); }
@@ -223,6 +266,8 @@ document.addEventListener("click", async event => {
 });
 
 $("#add-open").onclick = $("#empty-add").onclick = openAdd; $("#add-form").onsubmit = submitAdd; $("#settings-open").onclick = openSettings; $("#settings-form").onsubmit = saveSettings; $("#blocklist-open").onclick = openBlocklist;
+$("#login-form").onsubmit = submitLogin; $("#login-dialog").addEventListener("cancel", event => event.preventDefault()); $("#logout-button").onclick = logout;
+$("#random-port").onclick = () => { const values = new Uint32Array(1); crypto.getRandomValues(values); $("#settings-form [name=listen_port]").value = 49152 + values[0] % 16384; };
 $("#magnet-handler-toggle").onclick = toggleMagnetHandler;
 $("#search").oninput = event => { state.search = event.target.value; render(); }; $("#resume-selected").onclick = () => actionSelected("resume"); $("#pause-selected").onclick = () => actionSelected("pause");
 $("#remove-confirm-action").onclick = removeSelected;
@@ -256,4 +301,4 @@ $("#folder-up").onclick = () => state.folderParent && loadFolder(state.folderPar
 $("#folder-list").onclick = event => { const item=event.target.closest("[data-path]"); if(item) loadFolder(item.dataset.path); }; $("#folder-roots").onclick = event => { const item=event.target.closest("[data-path]"); if(item) loadFolder(item.dataset.path); };
 const dropZone=$("#drop-zone"); ["dragenter","dragover"].forEach(type=>dropZone.addEventListener(type,event=>{event.preventDefault();dropZone.classList.add("drag");})); ["dragleave","drop"].forEach(type=>dropZone.addEventListener(type,event=>{event.preventDefault();dropZone.classList.remove("drag");})); dropZone.addEventListener("drop",event=>{$("#torrent-file").files=event.dataTransfer.files;});
 
-restoreSort(); refresh(); setInterval(refresh, 1500);
+initialize();

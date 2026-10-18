@@ -1,20 +1,25 @@
 from __future__ import annotations
 
+import ipaddress
+import json
 import os
+import secrets
 import subprocess
 import sys
+import time
 import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Annotated
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .engine import TorrentEngine
 from .protocol import magnet_handler_status, register_magnet_handler, unregister_magnet_handler
+from .security import verify_password
 
 STATIC_DIR = Path(__file__).with_name("static")
 
@@ -23,12 +28,69 @@ STATIC_DIR = Path(__file__).with_name("static")
 async def lifespan(app: FastAPI):
     engine = TorrentEngine()
     app.state.engine = engine
+    app.state.auth_sessions = {}
     yield
     engine.close()
 
 
 app = FastAPI(title="BT Apokalypse", version="0.1.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+TAILSCALE_V4 = ipaddress.ip_network("100.64.0.0/10")
+TAILSCALE_V6 = ipaddress.ip_network("fd7a:115c:a1e0::/48")
+SESSION_SECONDS = 24 * 60 * 60
+SESSION_COOKIE = "bt_apokalypse_session"
+
+
+def _client_address(request: Request) -> str:
+    return request.client.host if request.client else ""
+
+
+def is_loopback(address: str) -> bool:
+    if address == "testclient":
+        return True
+    try:
+        return ipaddress.ip_address(address).is_loopback
+    except ValueError:
+        return False
+
+
+def webui_client_allowed(mode: str, address: str) -> bool:
+    if is_loopback(address):
+        return True
+    if mode == "lan":
+        return True
+    if mode != "tailscale":
+        return False
+    try:
+        client_ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    return client_ip in (TAILSCALE_V4 if client_ip.version == 4 else TAILSCALE_V6)
+
+
+def _authenticated(request: Request) -> bool:
+    token = request.cookies.get(SESSION_COOKIE, "")
+    expires = request.app.state.auth_sessions.get(token, 0)
+    if expires <= time.time():
+        request.app.state.auth_sessions.pop(token, None)
+        return False
+    return True
+
+
+@app.middleware("http")
+async def protect_webui(request: Request, call_next):
+    settings = request.app.state.engine.settings
+    address = _client_address(request)
+    access_mode = os.environ.get("APOKALYPSE_WEBUI_ACCESS_OVERRIDE", settings.webui_access)
+    if not webui_client_allowed(access_mode, address):
+        return JSONResponse({"detail": "WebUI access is not allowed from this network"}, status_code=403)
+    public_api = request.url.path in {"/api/auth/status", "/api/auth/login"}
+    needs_login = settings.webui_auth_enabled and not is_loopback(address)
+    if request.url.path.startswith("/api/") and needs_login and not public_api:
+        if not _authenticated(request):
+            return JSONResponse({"detail": "Authentication required"}, status_code=401)
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -64,6 +126,49 @@ def open_in_file_manager(folder: Path) -> None:
         stderr=subprocess.DEVNULL,
         close_fds=True,
     )
+
+
+def network_interfaces() -> list[dict[str, Any]]:
+    """Return usable Windows adapters and their IPv4 addresses."""
+    if os.name != "nt":
+        return []
+    script = (
+        "$items = Get-NetAdapter -ErrorAction Stop | ForEach-Object { "
+        "$ips = @(Get-NetIPAddress -InterfaceIndex $_.ifIndex -AddressFamily IPv4 "
+        "-ErrorAction SilentlyContinue | Select-Object -ExpandProperty IPAddress); "
+        "[PSCustomObject]@{Name=$_.Name; Description=$_.InterfaceDescription; "
+        "Guid=$_.InterfaceGuid.ToString(); Status=$_.Status.ToString(); IPv4=$ips} }; "
+        "$items | ConvertTo-Json -Depth 4 -Compress"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        raw = json.loads(result.stdout or "[]")
+        items = raw if isinstance(raw, list) else [raw]
+        interfaces = []
+        for item in items:
+            guid = str(item.get("Guid") or "").strip("{}")
+            addresses = item.get("IPv4") or []
+            if isinstance(addresses, str):
+                addresses = [addresses]
+            interfaces.append(
+                {
+                    "name": str(item.get("Name") or ""),
+                    "description": str(item.get("Description") or ""),
+                    "id": "{" + guid + "}" if guid else "",
+                    "status": str(item.get("Status") or "Unknown"),
+                    "ipv4": addresses,
+                }
+            )
+        return sorted(interfaces, key=lambda item: (item["status"] != "Up", item["name"].casefold()))
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        return []
 
 
 class MagnetInput(BaseModel):
@@ -107,6 +212,55 @@ class TextBlocklistInput(BaseModel):
 
 class UrlBlocklistInput(BaseModel):
     url: str
+
+
+class LoginInput(BaseModel):
+    username: str
+    password: str
+
+
+@app.get("/api/auth/status")
+def auth_status(request: Request) -> dict[str, Any]:
+    settings = engine(request).settings
+    bypassed = is_loopback(_client_address(request))
+    required = settings.webui_auth_enabled and not bypassed
+    return {
+        "required": required,
+        "authenticated": not required or _authenticated(request),
+        "local_bypass": bypassed,
+        "username": settings.webui_username,
+    }
+
+
+@app.post("/api/auth/login")
+def login(payload: LoginInput, request: Request):
+    settings = engine(request).settings
+    if is_loopback(_client_address(request)) or not settings.webui_auth_enabled:
+        return {"authenticated": True}
+    if payload.username != settings.webui_username or not verify_password(
+            payload.password, settings.webui_password_hash
+    ):
+        raise HTTPException(401, "Invalid username or password")
+    token = secrets.token_urlsafe(32)
+    request.app.state.auth_sessions[token] = time.time() + SESSION_SECONDS
+    response = JSONResponse({"authenticated": True})
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=SESSION_SECONDS,
+        httponly=True,
+        samesite="strict",
+    )
+    return response
+
+
+@app.delete("/api/auth/session")
+def logout(request: Request):
+    token = request.cookies.get(SESSION_COOKIE, "")
+    request.app.state.auth_sessions.pop(token, None)
+    response = JSONResponse({"authenticated": False})
+    response.delete_cookie(SESSION_COOKIE)
+    return response
 
 
 @app.get("/", include_in_schema=False)
@@ -252,9 +406,20 @@ def get_settings(request: Request) -> dict[str, Any]:
 @app.patch("/api/settings")
 def update_settings(request: Request, changes: dict[str, Any] = Body(...)) -> dict[str, Any]:
     try:
-        return engine(request).update_settings(changes)
+        auth_changed = bool(
+            {"webui_auth_enabled", "webui_username", "webui_password"}.intersection(changes)
+        )
+        result = engine(request).update_settings(changes)
+        if auth_changed:
+            request.app.state.auth_sessions.clear()
+        return result
     except Exception as exc:
         raise api_error(exc) from exc
+
+
+@app.get("/api/network/interfaces")
+def get_network_interfaces() -> list[dict[str, Any]]:
+    return network_interfaces()
 
 
 @app.get("/api/integration/magnet")

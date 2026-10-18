@@ -5,14 +5,15 @@ import pytest
 from apokalypse import protocol
 
 
-def test_submit_magnet_posts_to_local_api(monkeypatch) -> None:
+def test_submit_magnet_posts_to_configured_local_api(monkeypatch, tmp_path) -> None:
     calls: list[tuple[str, str]] = []
     magnet = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789"
+    monkeypatch.setenv("APOKALYPSE_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(protocol, "_post_magnet", lambda value, url: calls.append((value, url)))
 
     protocol.submit_magnet(magnet)
 
-    assert calls == [(magnet, "http://127.0.0.1:8080")]
+    assert calls == [(magnet, "http://127.0.0.1:6969")]
 
 
 def test_submit_magnet_rejects_other_protocols() -> None:

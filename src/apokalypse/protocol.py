@@ -73,9 +73,9 @@ def magnet_handler_status() -> dict[str, Any]:
     return {
         "supported": True,
         "registered": (
-            command.casefold() == expected.casefold()
-            and prog_id_command.casefold() == expected.casefold()
-            and registered_capabilities.casefold() == (APPLICATION_KEY + r"\Capabilities").casefold()
+                command.casefold() == expected.casefold()
+                and prog_id_command.casefold() == expected.casefold()
+                and registered_capabilities.casefold() == (APPLICATION_KEY + r"\Capabilities").casefold()
         ),
         "command": command,
     }
@@ -156,7 +156,7 @@ def unregister_magnet_handler() -> dict[str, Any]:
     _delete_registry_tree(winreg.HKEY_CURRENT_USER, APPLICATION_KEY)
     try:
         with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, REGISTERED_APPLICATIONS_KEY, 0, winreg.KEY_SET_VALUE
+                winreg.HKEY_CURRENT_USER, REGISTERED_APPLICATIONS_KEY, 0, winreg.KEY_SET_VALUE
         ) as key:
             winreg.DeleteValue(key, "BT Apokalypse")
     except FileNotFoundError:
@@ -191,9 +191,13 @@ def _post_magnet(magnet: str, api_url: str) -> None:
             raise RuntimeError(f"BT Apokalypse returned HTTP {response.status}")
 
 
-def submit_magnet(magnet: str, api_url: str = "http://127.0.0.1:8080") -> None:
+def submit_magnet(magnet: str, api_url: str | None = None) -> None:
     if not magnet.lower().startswith("magnet:?"):
         raise ValueError("A valid magnet URI is required")
+    if api_url is None:
+        from .config import JsonStore
+
+        api_url = f"http://127.0.0.1:{JsonStore().load_settings().webui_port}"
     try:
         _post_magnet(magnet, api_url)
         return

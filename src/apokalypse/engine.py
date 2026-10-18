@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import secrets
 import threading
 import time
 from dataclasses import asdict
@@ -12,6 +13,7 @@ import libtorrent as lt
 
 from .blocklist import BlockRule, parse_blocklist
 from .config import JsonStore, normalize_tracker_urls
+from .security import hash_password
 
 log = logging.getLogger(__name__)
 
@@ -52,6 +54,9 @@ class TorrentEngine:
     def __init__(self, store: JsonStore | None = None, start_worker: bool = True) -> None:
         self.store = store or JsonStore()
         self.settings = self.store.load_settings()
+        if self.settings.randomize_listen_port:
+            self.settings.listen_port = 49152 + secrets.randbelow(16384)
+            self.store.save_settings(self.settings)
         self.records = self.store.load_records()
         self.block_rules = [BlockRule(**rule) for rule in self.store.load_block_rules()]
         self._lock = threading.RLock()
@@ -69,11 +74,6 @@ class TorrentEngine:
     def _make_session(self) -> lt.session:
         settings = {
             "user_agent": "BT Apokalypse/0.1 libtorrent/" + lt.__version__,
-            "listen_interfaces": f"0.0.0.0:{self.settings.listen_port},[::]:{self.settings.listen_port}",
-            "enable_dht": self.settings.enable_dht,
-            "enable_lsd": self.settings.enable_lsd,
-            "enable_upnp": self.settings.enable_upnp,
-            "enable_natpmp": self.settings.enable_natpmp,
             "download_rate_limit": self.settings.download_limit_kib * 1024,
             "upload_rate_limit": self.settings.upload_limit_kib * 1024,
             "connections_limit": self.settings.max_connections,
@@ -83,7 +83,51 @@ class TorrentEngine:
             "dont_count_slow_torrents": False,
             "alert_mask": int(lt.alert.category_t.all_categories),
         }
+        settings.update(self._network_settings())
         return lt.session(settings)
+
+    def _network_settings(self) -> dict[str, Any]:
+        """Translate privacy preferences into libtorrent session settings."""
+        selected_interface = self.settings.bind_interface
+        listen_interfaces = (
+            f"{selected_interface}:{self.settings.listen_port}"
+            if selected_interface
+            else f"0.0.0.0:{self.settings.listen_port},[::]:{self.settings.listen_port}"
+        )
+        encryption = {
+            "require": (0, 0, 2, True),
+            "prefer": (1, 1, 3, False),
+            "disabled": (2, 2, 3, False),
+        }[self.settings.encryption_mode]
+        proxy_enabled = self.settings.proxy_type != "none"
+        proxy_type = {"none": 0, "socks5": 2, "socks5_password": 3}[
+            self.settings.proxy_type
+        ]
+        values: dict[str, Any] = {
+            "listen_interfaces": listen_interfaces,
+            "enable_dht": self.settings.enable_dht and not proxy_enabled,
+            "enable_lsd": self.settings.enable_lsd and not proxy_enabled,
+            "enable_upnp": self.settings.enable_upnp and not proxy_enabled,
+            "enable_natpmp": self.settings.enable_natpmp and not proxy_enabled,
+            "anonymous_mode": self.settings.anonymous_mode,
+            "out_enc_policy": encryption[0],
+            "in_enc_policy": encryption[1],
+            "allowed_enc_level": encryption[2],
+            "prefer_rc4": encryption[3],
+            "proxy_type": proxy_type,
+            "proxy_hostname": self.settings.proxy_hostname if proxy_enabled else "",
+            "proxy_port": self.settings.proxy_port,
+            "proxy_username": self.settings.proxy_username if proxy_enabled else "",
+            "proxy_password": self.settings.proxy_password if proxy_enabled else "",
+            "proxy_peer_connections": proxy_enabled,
+            "proxy_tracker_connections": proxy_enabled,
+            "proxy_hostnames": proxy_enabled,
+        }
+        if selected_interface:
+            values["outgoing_interfaces"] = selected_interface
+        else:
+            values["outgoing_interfaces"] = ""
+        return values
 
     def _restore_torrents(self) -> None:
         for torrent_id, record in list(self.records.items()):
@@ -182,12 +226,12 @@ class TorrentEngine:
             self._worker.join(timeout=1)
 
     def add_magnet(
-        self,
-        magnet: str,
-        save_path: str | None = None,
-        completed_path: str | None = None,
-        sequential: bool = False,
-        paused: bool = False,
+            self,
+            magnet: str,
+            save_path: str | None = None,
+            completed_path: str | None = None,
+            sequential: bool = False,
+            paused: bool = False,
     ) -> dict[str, Any]:
         if not magnet.lower().startswith("magnet:?"):
             raise ValueError("A valid magnet URI is required")
@@ -195,12 +239,12 @@ class TorrentEngine:
         return self._add(params, save_path, completed_path, sequential, paused, magnet=magnet)
 
     def add_torrent_bytes(
-        self,
-        contents: bytes,
-        save_path: str | None = None,
-        completed_path: str | None = None,
-        sequential: bool = False,
-        paused: bool = False,
+            self,
+            contents: bytes,
+            save_path: str | None = None,
+            completed_path: str | None = None,
+            sequential: bool = False,
+            paused: bool = False,
     ) -> dict[str, Any]:
         if len(contents) > 20 * 1024 * 1024:
             raise ValueError("Torrent files may not exceed 20 MiB")
@@ -213,13 +257,13 @@ class TorrentEngine:
         return result
 
     def _add(
-        self,
-        params: lt.add_torrent_params,
-        save_path: str | None,
-        completed_path: str | None,
-        sequential: bool,
-        paused: bool,
-        magnet: str = "",
+            self,
+            params: lt.add_torrent_params,
+            save_path: str | None,
+            completed_path: str | None,
+            sequential: bool,
+            paused: bool,
+            magnet: str = "",
     ) -> dict[str, Any]:
         target = Path(save_path or self.settings.download_dir).expanduser().resolve()
         target.mkdir(parents=True, exist_ok=True)
@@ -237,7 +281,8 @@ class TorrentEngine:
                 handle.pause()
             self._handles[torrent_id] = handle
             done_path = completed_path if completed_path is not None else self.settings.completed_dir
-            should_move = bool(done_path) if completed_path is not None else bool(done_path and self.settings.move_completed)
+            should_move = bool(done_path) if completed_path is not None else bool(
+                done_path and self.settings.move_completed)
             self.records[torrent_id] = {
                 "name": handle.name(),
                 "save_path": str(target),
@@ -475,40 +520,54 @@ class TorrentEngine:
         changes = dict(changes)
         if "tracker_list" in changes:
             changes["tracker_list"] = normalize_tracker_urls(changes["tracker_list"], reject_invalid=True)
-        allowed = set(asdict(self.settings))
+        if "webui_password_hash" in changes:
+            raise ValueError("Password hashes cannot be changed directly")
+        new_password = str(changes.pop("webui_password", ""))
+        if new_password:
+            changes["webui_password_hash"] = hash_password(new_password)
+        if not changes.get("proxy_password"):
+            changes.pop("proxy_password", None)
+        current = asdict(self.settings)
+        allowed = set(current)
         for key, value in changes.items():
             if key in allowed:
-                setattr(self.settings, key, value)
-        self.settings.normalized()
+                current[key] = value
+        candidate = type(self.settings)(**current).normalized()
+        if candidate.webui_auth_enabled and not candidate.webui_password_hash:
+            raise ValueError("Set a WebUI password before enabling authentication")
+        if candidate.webui_access == "tailscale" and not candidate.webui_auth_enabled:
+            raise ValueError("Tailscale WebUI access requires password authentication")
+        if candidate.proxy_type != "none" and not candidate.proxy_hostname:
+            raise ValueError("Enter a SOCKS5 proxy hostname")
+        self.settings = candidate
         Path(self.settings.download_dir).mkdir(parents=True, exist_ok=True)
         if self.settings.completed_dir:
             Path(self.settings.completed_dir).mkdir(parents=True, exist_ok=True)
         self.store.save_settings(self.settings)
-        self.session.apply_settings(
-            {
-                "listen_interfaces": f"0.0.0.0:{self.settings.listen_port},[::]:{self.settings.listen_port}",
-                "enable_dht": self.settings.enable_dht,
-                "enable_lsd": self.settings.enable_lsd,
-                "enable_upnp": self.settings.enable_upnp,
-                "enable_natpmp": self.settings.enable_natpmp,
-                "download_rate_limit": self.settings.download_limit_kib * 1024,
-                "upload_rate_limit": self.settings.upload_limit_kib * 1024,
-                "connections_limit": self.settings.max_connections,
-                "active_downloads": self.settings.max_active_downloads,
-                "active_seeds": self.settings.max_active_seeds,
-                "active_limit": self.settings.max_active_downloads + self.settings.max_active_seeds,
-                "dont_count_slow_torrents": False,
-            }
-        )
+        session_settings = {
+            "download_rate_limit": self.settings.download_limit_kib * 1024,
+            "upload_rate_limit": self.settings.upload_limit_kib * 1024,
+            "connections_limit": self.settings.max_connections,
+            "active_downloads": self.settings.max_active_downloads,
+            "active_seeds": self.settings.max_active_seeds,
+            "active_limit": self.settings.max_active_downloads + self.settings.max_active_seeds,
+            "dont_count_slow_torrents": False,
+        }
+        session_settings.update(self._network_settings())
+        self.session.apply_settings(session_settings)
         for handle in self._handles.values():
             if self.settings.enable_pex:
                 handle.unset_flags(lt.torrent_flags.disable_pex)
             else:
                 handle.set_flags(lt.torrent_flags.disable_pex)
-        return asdict(self.settings)
+        return self.get_settings()
 
     def get_settings(self) -> dict[str, Any]:
-        return asdict(self.settings)
+        values = asdict(self.settings)
+        values["proxy_password"] = ""
+        values["proxy_password_set"] = bool(self.settings.proxy_password)
+        values["webui_password_set"] = bool(values.pop("webui_password_hash"))
+        return values
 
     def _apply_blocklist(self) -> None:
         ip_filter = lt.ip_filter()

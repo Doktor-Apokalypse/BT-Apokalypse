@@ -6,7 +6,7 @@
   <title>BT Apokalypse</title>
   <link rel="icon" type="image/x-icon" sizes="32x32" href="/static/favicon-32.ico">
   <link rel="icon" type="image/x-icon" sizes="64x64" href="/static/favicon-64.ico">
-  <link rel="stylesheet" href="/static/app.css?v=20261018-2">
+  <link rel="stylesheet" href="/static/app.css?v=20261018-3">
 </head>
 <body>
   <div class="app-shell">
@@ -31,6 +31,7 @@
       </div>
       <button class="side-link" id="blocklist-open">Shield &amp; blocklist <span id="block-count">0</span></button>
       <button class="side-link" id="settings-open">Settings <span>⌘</span></button>
+      <button class="side-link hidden" id="logout-button">Sign out <span>↪</span></button>
     </aside>
 
     <main class="main">
@@ -118,8 +119,22 @@
         <label>Move completed torrents to<div class="input-button"><input name="completed_dir" id="settings-completed"><button type="button" class="browse" data-browse="settings-completed">Browse</button></div></label>
         <label class="checkline"><input name="move_completed" type="checkbox"> Move completed downloads automatically</label>
         <h3>Network</h3>
-        <div class="three-col"><label>Listen port<input name="listen_port" type="number" min="1" max="65535"></label><label>Max connections<input name="max_connections" type="number" min="10"></label><label>Start torrents<select name="auto_start"><option value="true">Automatically</option><option value="false">Paused</option></select></label></div>
+        <div class="three-col"><label>Torrent listen port<div class="input-button"><input name="listen_port" type="number" min="1" max="65535"><button type="button" class="browse" id="random-port">Generate</button></div></label><label>Max connections<input name="max_connections" type="number" min="10"></label><label>Start torrents<select name="auto_start"><option value="true">Automatically</option><option value="false">Paused</option></select></label></div>
+        <label class="checkline"><input name="randomize_listen_port" type="checkbox"> Generate a new torrent listen port whenever the client starts</label>
         <div class="toggle-grid"><label><input name="enable_dht" type="checkbox"> DHT</label><label><input name="enable_pex" type="checkbox"> Peer exchange</label><label><input name="enable_lsd" type="checkbox"> Local discovery</label><label><input name="enable_upnp" type="checkbox"> UPnP</label><label><input name="enable_natpmp" type="checkbox"> NAT-PMP</label></div>
+        <p class="help">With Proton VPN port forwarding, enter Proton's assigned port, turn off automatic port randomization, UPnP and NAT-PMP. Generate selects a private-range port for ordinary connections. All torrents share one secure libtorrent session and listen port.</p>
+        <h3>Privacy &amp; connection security</h3>
+        <div class="two-col"><label>Peer encryption<select name="encryption_mode"><option value="prefer">Prefer encryption</option><option value="require">Require encryption</option><option value="disabled">Allow unencrypted only</option></select></label><label>Torrent network interface<select name="bind_interface" id="bind-interface"><option value="">All interfaces</option></select></label></div>
+        <label class="checkline"><input name="anonymous_mode" type="checkbox"> Anonymous mode (reduces identifying protocol data)</label>
+        <p class="help" id="interface-help">Bind to the ProtonVPN adapter to stop torrent traffic if that tunnel disappears. Proton VPN does not provide a SOCKS5 proxy.</p>
+        <div class="three-col"><label>Proxy<select name="proxy_type"><option value="none">None</option><option value="socks5">SOCKS5</option><option value="socks5_password">SOCKS5 with password</option></select></label><label>Proxy host<input name="proxy_hostname" autocomplete="off"></label><label>Proxy port<input name="proxy_port" type="number" min="1" max="65535"></label></div>
+        <div class="two-col"><label>Proxy username<input name="proxy_username" autocomplete="off"></label><label>Proxy password <small>(blank keeps saved password)</small><input name="proxy_password" type="password" autocomplete="new-password"></label></div>
+        <p class="help">When a proxy is enabled, DHT, local discovery, UPnP and NAT-PMP are disabled to prevent traffic bypassing it.</p>
+        <h3>WebUI access</h3>
+        <div class="two-col"><label>Allowed network<select name="webui_access"><option value="local">This computer only</option><option value="tailscale">Tailscale only</option><option value="lan">Local network</option></select></label><label>WebUI port<input name="webui_port" type="number" min="1" max="65535"></label></div>
+        <label class="checkline"><input name="webui_auth_enabled" type="checkbox"> Require a password for remote WebUI access</label>
+        <div class="two-col"><label>WebUI username<input name="webui_username" autocomplete="username"></label><label>WebUI password <small>(minimum 8 characters; blank keeps saved password)</small><input name="webui_password" type="password" autocomplete="new-password"></label></div>
+        <p class="help" id="webui-access-help">Localhost always bypasses the password. Tailscale clients use its encrypted connection and must sign in. Changes to the allowed network or WebUI port take effect after restarting BT Apokalypse.</p>
         <h3>Queue limits</h3>
         <div class="two-col"><label>Maximum active downloads<input name="max_active_downloads" type="number" min="1" max="1000"></label><label>Maximum active seeds<input name="max_active_seeds" type="number" min="1" max="1000"></label></div>
         <p class="help">Additional torrents remain queued until an active download or seed slot becomes available.</p>
@@ -165,7 +180,18 @@
     </div>
   </dialog>
 
+  <dialog id="login-dialog" class="modal login-modal">
+    <form id="login-form">
+      <header><div><p class="eyebrow">REMOTE ACCESS</p><h2>Sign in to BT Apokalypse</h2></div></header>
+      <p class="help">This WebUI requires the credentials configured on the computer running BT Apokalypse.</p>
+      <label>Username<input id="login-username" autocomplete="username" required></label>
+      <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
+      <p class="login-error" id="login-error"></p>
+      <footer><button type="submit" class="primary">Sign in</button></footer>
+    </form>
+  </dialog>
+
   <div id="toast-stack" aria-live="polite"></div>
-  <script src="/static/app.js?v=20261018-2" defer></script>
+  <script src="/static/app.js?v=20261018-3" defer></script>
 </body>
 </html>

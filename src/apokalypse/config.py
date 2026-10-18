@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from .security import protect_secret, unprotect_secret
 
 TRACKER_URL_PREFIXES = ("http://", "https://", "udp://", "ws://", "wss://")
 
@@ -57,6 +58,7 @@ class AppSettings:
     completed_dir: str = ""
     move_completed: bool = False
     listen_port: int = 6881
+    randomize_listen_port: bool = False
     enable_dht: bool = True
     enable_pex: bool = True
     enable_lsd: bool = True
@@ -70,6 +72,20 @@ class AppSettings:
     max_active_seeds: int = 5
     add_trackers_to_new_torrents: bool = False
     tracker_list: list[str] = field(default_factory=list)
+    encryption_mode: str = "prefer"
+    anonymous_mode: bool = False
+    bind_interface: str = ""
+    bind_interface_name: str = ""
+    proxy_type: str = "none"
+    proxy_hostname: str = ""
+    proxy_port: int = 1080
+    proxy_username: str = ""
+    proxy_password: str = ""
+    webui_access: str = "local"
+    webui_port: int = 6969
+    webui_auth_enabled: bool = False
+    webui_username: str = "admin"
+    webui_password_hash: str = ""
 
     def normalized(self) -> "AppSettings":
         self.download_dir = str(Path(self.download_dir).expanduser().resolve())
@@ -82,6 +98,19 @@ class AppSettings:
         self.max_active_downloads = min(1000, max(1, int(self.max_active_downloads)))
         self.max_active_seeds = min(1000, max(1, int(self.max_active_seeds)))
         self.tracker_list = normalize_tracker_urls(self.tracker_list)
+        if self.encryption_mode not in {"prefer", "require", "disabled"}:
+            self.encryption_mode = "prefer"
+        if self.proxy_type not in {"none", "socks5", "socks5_password"}:
+            self.proxy_type = "none"
+        self.bind_interface = str(self.bind_interface or "").strip()
+        self.bind_interface_name = str(self.bind_interface_name or "").strip()
+        self.proxy_hostname = str(self.proxy_hostname or "").strip()
+        self.proxy_port = min(65535, max(1, int(self.proxy_port)))
+        self.proxy_username = str(self.proxy_username or "").strip()
+        self.webui_username = str(self.webui_username or "admin").strip() or "admin"
+        if self.webui_access not in {"local", "lan", "tailscale"}:
+            self.webui_access = "local"
+        self.webui_port = min(65535, max(1, int(self.webui_port)))
         return self
 
 
@@ -112,11 +141,15 @@ class JsonStore:
 
     def load_settings(self) -> AppSettings:
         raw = self._read_json("settings.json", {})
+        if isinstance(raw, dict) and "proxy_password" in raw:
+            raw["proxy_password"] = unprotect_secret(str(raw["proxy_password"]))
         allowed = {field.name for field in fields(AppSettings)}
         return AppSettings(**{key: value for key, value in raw.items() if key in allowed}).normalized()
 
     def save_settings(self, settings: AppSettings) -> None:
-        self._write_json("settings.json", asdict(settings.normalized()))
+        raw = asdict(settings.normalized())
+        raw["proxy_password"] = protect_secret(settings.proxy_password)
+        self._write_json("settings.json", raw)
 
     def load_records(self) -> dict[str, dict[str, Any]]:
         value = self._read_json("torrents.json", {})

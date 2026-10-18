@@ -30,12 +30,14 @@ try {
     if ($SkipInstaller) { return }
 
     $compilerCandidates = @(
+        "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+        "$env:ProgramFiles\Inno Setup 7\ISCC.exe",
         "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
         "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
     )
     $innoCompiler = $compilerCandidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
     if (-not $innoCompiler) {
-        Write-Warning "Inno Setup 6 is not installed. The standalone folder is ready; install Inno Setup and rerun this script to create the installer."
+        Write-Warning "Inno Setup 6 or 7 is not installed. The standalone folder is ready; install Inno Setup and rerun this script to create the installer."
         return
     }
 

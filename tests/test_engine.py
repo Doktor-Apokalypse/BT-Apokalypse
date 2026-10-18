@@ -121,3 +121,36 @@ def test_block_rules_are_persistent(tmp_path: Path) -> None:
         engine.close()
 
     assert len(store.load_block_rules()) == 2
+
+
+def test_security_settings_are_applied_and_secrets_are_redacted(tmp_path: Path) -> None:
+    store = JsonStore(tmp_path / "state")
+    engine = TorrentEngine(store, start_worker=False)
+    try:
+        result = engine.update_settings(
+            {
+                "encryption_mode": "require",
+                "anonymous_mode": True,
+                "proxy_type": "socks5_password",
+                "proxy_hostname": "127.0.0.1",
+                "proxy_port": 1080,
+                "proxy_username": "proxy-user",
+                "proxy_password": "proxy-secret",
+            }
+        )
+        applied = engine.session.get_settings()
+        assert applied["anonymous_mode"] is True
+        assert applied["out_enc_policy"] == 0
+        assert applied["allowed_enc_level"] == 2
+        assert applied["proxy_type"] == 3
+        assert applied["enable_dht"] is False
+        assert applied["enable_lsd"] is False
+        assert result["proxy_password"] == ""
+        assert result["proxy_password_set"] is True
+        assert "webui_password_hash" not in result
+    finally:
+        engine.close()
+
+    loaded = store.load_settings()
+    assert loaded.proxy_password == "proxy-secret"
+    assert "proxy-secret" not in (store.data_dir / "settings.json").read_text(encoding="utf-8")

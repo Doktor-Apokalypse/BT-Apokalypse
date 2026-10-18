@@ -1,6 +1,7 @@
 """Application and magnet protocol entry point."""
 
 import argparse
+import os
 import sys
 import tempfile
 import threading
@@ -12,8 +13,8 @@ import webbrowser
 def run() -> None:
     """Run the web application."""
     parser = argparse.ArgumentParser(prog="apokalypse")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--host")
+    parser.add_argument("--port", type=int)
     parser.add_argument("--open-browser", action="store_true", help="open the WebUI after startup")
     parser.add_argument("--no-browser", action="store_true", help="do not open the WebUI after startup")
     parser.add_argument("--tray", action="store_true", help="show a Windows notification-area icon")
@@ -56,9 +57,19 @@ def run() -> None:
             finally:
                 torrent_engine.close()
         return
+
+    from apokalypse.config import JsonStore
+
+    saved_settings = JsonStore().load_settings()
+    port = args.port or saved_settings.webui_port
+    host = args.host or (
+        "0.0.0.0" if saved_settings.webui_access in {"lan", "tailscale"} else "127.0.0.1"
+    )
+    if args.host and args.host not in {"127.0.0.1", "::1", "localhost"}:
+        os.environ["APOKALYPSE_WEBUI_ACCESS_OVERRIDE"] = "lan"
     if args.magnet:
         try:
-            submit_magnet(args.magnet, f"http://127.0.0.1:{args.port}")
+            submit_magnet(args.magnet, f"http://127.0.0.1:{port}")
         except Exception as exc:
             write_handler_error(exc)
             raise
@@ -67,9 +78,9 @@ def run() -> None:
     import uvicorn
     from apokalypse.web import app
 
-    web_url = f"http://127.0.0.1:{args.port}"
+    web_url = f"http://127.0.0.1:{port}"
     try:
-        with urllib.request.urlopen(web_url + "/api/status", timeout=0.5):
+        with urllib.request.urlopen(web_url + "/api/auth/status", timeout=0.5):
             if not args.no_browser:
                 webbrowser.open(web_url)
             return
@@ -84,8 +95,8 @@ def run() -> None:
 
     config = uvicorn.Config(
         app,
-        host=args.host,
-        port=args.port,
+        host=host,
+        port=port,
         loop="asyncio",
         http="h11",
         log_config=None,

@@ -19,6 +19,11 @@ BT Apokalypse is a self-hosted BitTorrent client with a browser interface. Its t
 - Server-side folder browser, including Windows drive selection
 - Windows `magnet:` protocol integration for links clicked in Chrome, Edge, Firefox, and other browsers
 - Windows task-tray controls for reopening the WebUI or shutting down the background client
+- Prefer or require encrypted peer connections and reduce identifying protocol data with anonymous mode
+- Bind torrent traffic to a selected network adapter, including ProtonVPN and other VPN tunnels
+- Optional SOCKS5 proxying with Windows-protected password storage and leak-resistant discovery settings
+- Password-protected LAN or Tailscale WebUI access, with password-free access from localhost
+- A generated torrent listen port on demand or on each startup (one port per libtorrent session)
 
 ## Run it
 
@@ -31,8 +36,25 @@ python -m pip install -e .
 apokalypse
 ```
 
-Open <http://127.0.0.1:8080>. The WebUI listens on localhost by default. Torrent traffic listens on
+Open <http://127.0.0.1:6969>. The WebUI listens on localhost by default. Torrent traffic listens on
 port `6881` by default and can be changed in Settings.
+
+To use the WebUI through Tailscale, open **Settings → WebUI access**, select **Tailscale only**, set a
+username and password, enable remote password authentication, and restart BT Apokalypse. Open
+`http://<tailscale-ip>:6969` from another device in the same tailnet. Regular LAN addresses are rejected
+in this mode. Requests from `127.0.0.1` and `::1` remain password-free.
+
+If Windows Firewall blocks the connection, run this once in an elevated PowerShell window to allow
+only Tailscale source addresses:
+
+```powershell
+New-NetFirewallRule -DisplayName "BT Apokalypse Tailscale WebUI" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 6969 -RemoteAddress 100.64.0.0/10,fd7a:115c:a1e0::/48
+```
+
+For Proton VPN, select its adapter under **Settings → Privacy & connection security** to keep torrent
+traffic on the VPN tunnel. Proton does not offer SOCKS5; those fields are for other proxy providers. If
+using Proton's port forwarding, copy its assigned port into **Torrent listen port** and disable UPnP and
+NAT-PMP. Proton can assign a new port after reconnecting.
 
 On Windows, open **Settings → Browser integration** and enable the magnet handler. Browsers may show a
 one-time confirmation before opening BT Apokalypse. If the client is not running when a magnet link is
@@ -62,7 +84,7 @@ pytest
 
 ## API
 
-Interactive API documentation is available at <http://127.0.0.1:8080/docs>. The REST API exposes
+Interactive API documentation is available at <http://127.0.0.1:6969/docs>. The REST API exposes
 torrents, files, peers, trackers, session settings, filesystem browsing, and blocklist management.
 
 ## Build the Windows application
