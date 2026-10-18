@@ -16,6 +16,8 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
         assert '/static/favicon-64.ico' in page.text
         assert 'name="max_active_downloads"' in page.text
         assert 'name="max_active_seeds"' in page.text
+        assert 'name="add_trackers_to_new_torrents"' in page.text
+        assert 'name="tracker_list"' in page.text
         assert 'data-remove-files="false"' in page.text
         assert 'data-remove-files="true"' in page.text
         assert 'id="remove-confirm-dialog"' in page.text
@@ -32,6 +34,8 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
         assert settings["enable_dht"] is True
         assert settings["max_active_downloads"] == 3
         assert settings["max_active_seeds"] == 5
+        assert settings["add_trackers_to_new_torrents"] is False
+        assert settings["tracker_list"] == []
 
         imported = client.post("/api/blocklist/text", json={"text": "203.0.113.1"}).json()
         assert imported == {"added": 1, "total": 1}

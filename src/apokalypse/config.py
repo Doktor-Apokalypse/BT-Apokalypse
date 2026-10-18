@@ -3,10 +3,41 @@ from __future__ import annotations
 import json
 import os
 import sys
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from threading import RLock
 from typing import Any
+
+
+TRACKER_URL_PREFIXES = ("http://", "https://", "udp://", "ws://", "wss://")
+
+
+def normalize_tracker_urls(value: Any, *, reject_invalid: bool = False) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        entries = value.splitlines()
+    elif isinstance(value, (list, tuple)):
+        entries = value
+    else:
+        if reject_invalid:
+            raise ValueError("Tracker list must contain one URL per line")
+        return []
+
+    result: list[str] = []
+    seen: set[str] = set()
+    for entry in entries:
+        url = entry.strip() if isinstance(entry, str) else ""
+        if not url:
+            continue
+        if not url.lower().startswith(TRACKER_URL_PREFIXES):
+            if reject_invalid:
+                raise ValueError(f"Unsupported tracker URL: {url}")
+            continue
+        if url not in seen:
+            seen.add(url)
+            result.append(url)
+    return result
 
 
 def default_data_dir() -> Path:
@@ -37,6 +68,8 @@ class AppSettings:
     max_connections: int = 500
     max_active_downloads: int = 3
     max_active_seeds: int = 5
+    add_trackers_to_new_torrents: bool = False
+    tracker_list: list[str] = field(default_factory=list)
 
     def normalized(self) -> "AppSettings":
         self.download_dir = str(Path(self.download_dir).expanduser().resolve())
@@ -48,6 +81,7 @@ class AppSettings:
         self.max_connections = max(10, int(self.max_connections))
         self.max_active_downloads = min(1000, max(1, int(self.max_active_downloads)))
         self.max_active_seeds = min(1000, max(1, int(self.max_active_seeds)))
+        self.tracker_list = normalize_tracker_urls(self.tracker_list)
         return self
 
 

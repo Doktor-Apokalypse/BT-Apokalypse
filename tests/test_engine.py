@@ -58,6 +58,49 @@ def test_add_manage_and_remove_torrent(tmp_path: Path) -> None:
         engine.close()
 
 
+def test_global_and_individual_tracker_lists(tmp_path: Path) -> None:
+    store = JsonStore(tmp_path / "state")
+    engine = TorrentEngine(store, start_worker=False)
+    try:
+        settings = engine.update_settings(
+            {
+                "add_trackers_to_new_torrents": True,
+                "tracker_list": [
+                    "udp://tracker.example:80/announce",
+                    "https://tracker.two.example/announce",
+                    "https://tracker.two.example/announce",
+                ],
+            }
+        )
+        assert settings["tracker_list"] == [
+            "udp://tracker.example:80/announce",
+            "https://tracker.two.example/announce",
+        ]
+
+        result = engine.add_torrent_bytes(make_torrent(tmp_path), str(tmp_path / "downloads"))
+        torrent_id = result["id"]
+        urls = [tracker["url"] for tracker in engine.trackers(torrent_id)]
+        assert urls.count("udp://tracker.example:80/announce") == 1
+        assert "https://tracker.two.example/announce" in urls
+
+        trackers = engine.add_trackers(
+            torrent_id,
+            ["https://tracker.two.example/announce", "udp://tracker.manual.example:6969/announce"],
+        )
+        urls = [tracker["url"] for tracker in trackers]
+        assert urls.count("https://tracker.two.example/announce") == 1
+        assert "udp://tracker.manual.example:6969/announce" in urls
+    finally:
+        engine.close()
+
+    saved = store.load_settings()
+    assert saved.add_trackers_to_new_torrents is True
+    assert saved.tracker_list == [
+        "udp://tracker.example:80/announce",
+        "https://tracker.two.example/announce",
+    ]
+
+
 def test_block_rules_are_persistent(tmp_path: Path) -> None:
     store = JsonStore(tmp_path / "state")
     engine = TorrentEngine(store, start_worker=False)

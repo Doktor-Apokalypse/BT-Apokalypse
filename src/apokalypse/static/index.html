@@ -123,6 +123,10 @@
         <h3>Queue limits</h3>
         <div class="two-col"><label>Maximum active downloads<input name="max_active_downloads" type="number" min="1" max="1000"></label><label>Maximum active seeds<input name="max_active_seeds" type="number" min="1" max="1000"></label></div>
         <p class="help">Additional torrents remain queued until an active download or seed slot becomes available.</p>
+        <h3>Trackers</h3>
+        <label class="checkline"><input name="add_trackers_to_new_torrents" type="checkbox"> Add trackers to new torrents and magnet links</label>
+        <label>Tracker list <small>(one URL per line)</small><textarea name="tracker_list" rows="6" placeholder="udp://tracker.example:80/announce&#10;https://tracker.example/announce"></textarea></label>
+        <p class="help">Duplicate tracker URLs already supplied by a torrent or magnet link are skipped.</p>
         <h3>Browser integration</h3>
         <div class="integration-row"><div><strong>Open magnet links in BT Apokalypse</strong><small id="magnet-handler-status">Checking Windows association…</small></div><button type="button" class="secondary" id="magnet-handler-toggle">Enable</button></div>
         <h3>Speed limits <small>(0 is unlimited)</small></h3>

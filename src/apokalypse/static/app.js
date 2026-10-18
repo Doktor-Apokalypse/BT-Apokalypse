@@ -156,7 +156,7 @@ async function loadDetail() {
       content.innerHTML = peers.length ? `<table class="mini-table"><thead><tr><th>Address</th><th>Client</th><th>Progress</th><th>Down</th><th>Up</th><th></th></tr></thead><tbody>${peers.map(p => `<tr><td>${escapeHtml(p.ip)}:${p.port}</td><td>${escapeHtml(p.client || 'Unknown')}</td><td>${p.progress}%</td><td>${rate(p.download_rate)}</td><td>${rate(p.upload_rate)}</td><td><button class="secondary ban-peer" data-ip="${escapeHtml(p.ip)}">Ban</button></td></tr>`).join("")}</tbody></table>` : '<p class="help">No connected peers.</p>';
     } else if (state.detailTab === "trackers") {
       const trackers = await api(`/api/torrents/${state.detailId}/trackers`);
-      content.innerHTML = `<form id="tracker-form" class="inline-form"><input id="tracker-url" placeholder="udp://tracker.example:80/announce"><button class="secondary">Add</button></form><table class="mini-table"><thead><tr><th>Tracker</th><th>Tier</th><th>Status</th></tr></thead><tbody>${trackers.map(t => `<tr><td>${escapeHtml(t.url)}</td><td>${t.tier}</td><td>${t.verified?'Verified':'Waiting'}</td></tr>`).join("")}</tbody></table>`;
+      content.innerHTML = `<form id="tracker-form" class="tracker-form"><label>Tracker URLs <small>(one per line)</small><textarea id="tracker-urls" rows="4" placeholder="udp://tracker.example:80/announce&#10;https://tracker.example/announce"></textarea></label><div><span class="help">Existing tracker URLs are skipped.</span><button class="secondary">Add trackers</button></div></form>${trackers.length ? `<table class="mini-table"><thead><tr><th>Tracker</th><th>Tier</th><th>Status</th></tr></thead><tbody>${trackers.map(t => `<tr><td>${escapeHtml(t.url)}</td><td>${t.tier}</td><td>${t.verified?'Verified':'Waiting'}</td></tr>`).join("")}</tbody></table>` : '<p class="help">This torrent has no trackers. It can still find peers through DHT and peer exchange.</p>'}`;
     } else {
       const torrent = state.torrents.find(t => t.id === state.detailId);
       content.innerHTML = `<div class="detail-options"><section><h3>Download behavior</h3><label class="checkline"><input id="detail-sequential" type="checkbox" ${torrent.sequential?'checked':''}> Download pieces sequentially</label><label class="checkline"><input id="detail-move" type="checkbox" ${torrent.move_completed?'checked':''}> Move after completion</label><label>Completed folder<div class="input-button"><input id="detail-completed" value="${escapeHtml(torrent.completed_path)}"><button type="button" class="browse" data-browse="detail-completed">Browse</button></div></label><button id="detail-save" class="primary">Save options</button></section><section><h3>Maintenance</h3><p class="help">Force a data verification or ask trackers and DHT for peers immediately.</p><div class="toggle-row"><button class="secondary detail-action" data-action="recheck">Recheck files</button><button class="secondary detail-action" data-action="reannounce">Reannounce</button></div><p class="help">Current data folder<br><strong>${escapeHtml(torrent.save_path)}</strong></p><button id="detail-open-folder" class="secondary">Open download folder</button></section></div>`;
@@ -167,7 +167,7 @@ async function loadDetail() {
 async function openSettings() {
   try {
     state.settings = await api("/api/settings"); const form = $("#settings-form");
-    Object.entries(state.settings).forEach(([key,value]) => { const field = form.elements.namedItem(key); if (!field) return; if (field.type === "checkbox") field.checked = !!value; else field.value = String(value); });
+    Object.entries(state.settings).forEach(([key,value]) => { const field = form.elements.namedItem(key); if (!field) return; if (field.type === "checkbox") field.checked = !!value; else if (key === "tracker_list") field.value = Array.isArray(value) ? value.join("\n") : String(value || ""); else field.value = String(value); });
     show($("#settings-dialog")); await loadMagnetHandler();
   } catch (error) { toast(error.message,true); }
 }
@@ -187,7 +187,8 @@ async function saveSettings(event) {
   event.preventDefault(); const form = new FormData(event.target); const payload = {};
   ["download_dir","completed_dir"].forEach(key => payload[key] = form.get(key));
   ["listen_port","max_connections","max_active_downloads","max_active_seeds","download_limit_kib","upload_limit_kib"].forEach(key => payload[key] = Number(form.get(key)));
-  ["move_completed","enable_dht","enable_pex","enable_lsd","enable_upnp","enable_natpmp"].forEach(key => payload[key] = event.target.elements.namedItem(key).checked);
+  ["move_completed","enable_dht","enable_pex","enable_lsd","enable_upnp","enable_natpmp","add_trackers_to_new_torrents"].forEach(key => payload[key] = event.target.elements.namedItem(key).checked);
+  payload.tracker_list = String(form.get("tracker_list") || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   payload.auto_start = form.get("auto_start") === "true";
   try { await api("/api/settings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); $("#settings-dialog").close(); toast("Settings saved"); await refresh(); }
   catch(error){ toast(error.message,true); }
@@ -230,7 +231,7 @@ $("#sort-select").onchange = event => { state.sortKey=event.target.value; state.
 $("#select-all").onchange = event => { state.torrents.filter(matchesFilter).forEach(t => event.target.checked ? state.selected.add(t.id) : state.selected.delete(t.id)); render(); };
 $("#torrent-list").addEventListener("dblclick", event => { const row=event.target.closest("tr"); if(row) api(`/api/torrents/${row.dataset.id}/action`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"resume"})}).then(refresh); });
 $("#detail-content").addEventListener("change", async event => { if (!event.target.matches(".file-priority")) return; try { await api(`/api/torrents/${state.detailId}/files`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({priorities:{[event.target.dataset.index]:Number(event.target.value)}})}); } catch(error){toast(error.message,true);} });
-$("#detail-content").addEventListener("submit", async event => { if (event.target.id !== "tracker-form") return; event.preventDefault(); try { await api(`/api/torrents/${state.detailId}/trackers`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:$("#tracker-url").value})}); await loadDetail(); } catch(error){toast(error.message,true);} });
+$("#detail-content").addEventListener("submit", async event => { if (event.target.id !== "tracker-form") return; event.preventDefault(); const urls=$("#tracker-urls").value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean); if(!urls.length)return toast("Enter at least one tracker URL",true); try { await api(`/api/torrents/${state.detailId}/trackers`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({urls})}); toast("Tracker list updated"); await loadDetail(); } catch(error){toast(error.message,true);} });
 $("#detail-content").addEventListener("click", async event => {
   if (event.target.id === "detail-open-folder") {
     try { await api(`/api/torrents/${state.detailId}/open-folder`,{method:"POST"}); toast("Opened download folder"); }

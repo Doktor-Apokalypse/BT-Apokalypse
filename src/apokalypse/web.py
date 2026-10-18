@@ -84,7 +84,8 @@ class PriorityInput(BaseModel):
 
 
 class TrackerInput(BaseModel):
-    url: str
+    url: str | None = None
+    urls: list[str] = Field(default_factory=list)
     tier: int = Field(0, ge=0)
 
 
@@ -221,7 +222,8 @@ def torrent_trackers(torrent_id: str, request: Request) -> list[dict[str, Any]]:
 @app.post("/api/torrents/{torrent_id}/trackers")
 def add_tracker(torrent_id: str, payload: TrackerInput, request: Request) -> list[dict[str, Any]]:
     try:
-        return engine(request).add_tracker(torrent_id, payload.url, payload.tier)
+        urls = [*payload.urls, *([payload.url] if payload.url else [])]
+        return engine(request).add_trackers(torrent_id, urls, payload.tier)
     except Exception as exc:
         raise api_error(exc) from exc
 

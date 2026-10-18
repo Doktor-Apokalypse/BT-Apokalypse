@@ -11,7 +11,7 @@ from typing import Any
 import libtorrent as lt
 
 from .blocklist import BlockRule, parse_blocklist
-from .config import JsonStore
+from .config import JsonStore, normalize_tracker_urls
 
 log = logging.getLogger(__name__)
 
@@ -230,6 +230,8 @@ class TorrentEngine:
             torrent_id = _hash_string(handle)
             if torrent_id in self._handles:
                 raise ValueError("This torrent is already in the client")
+            if self.settings.add_trackers_to_new_torrents:
+                self._add_trackers_to_handle(handle, self.settings.tracker_list)
             handle.set_sequential_download(sequential)
             if paused or not self.settings.auto_start:
                 handle.pause()
@@ -418,12 +420,28 @@ class TorrentEngine:
                 for tracker in self._handle(torrent_id).trackers()
             ]
 
-    def add_tracker(self, torrent_id: str, url: str, tier: int = 0) -> list[dict[str, Any]]:
-        if not url.startswith(("http://", "https://", "udp://", "ws://", "wss://")):
-            raise ValueError("Unsupported tracker URL")
+    @staticmethod
+    def _add_trackers_to_handle(handle: lt.torrent_handle, urls: list[str], tier: int = 0) -> int:
+        existing = {tracker["url"] for tracker in handle.trackers()}
+        added = 0
+        for url in urls:
+            if url in existing:
+                continue
+            handle.add_tracker({"url": url, "tier": max(0, tier)})
+            existing.add(url)
+            added += 1
+        return added
+
+    def add_trackers(self, torrent_id: str, urls: list[str], tier: int = 0) -> list[dict[str, Any]]:
+        normalized = normalize_tracker_urls(urls, reject_invalid=True)
+        if not normalized:
+            raise ValueError("Enter at least one tracker URL")
         with self._lock:
-            self._handle(torrent_id).add_tracker({"url": url, "tier": max(0, tier)})
+            self._add_trackers_to_handle(self._handle(torrent_id), normalized, tier)
         return self.trackers(torrent_id)
+
+    def add_tracker(self, torrent_id: str, url: str, tier: int = 0) -> list[dict[str, Any]]:
+        return self.add_trackers(torrent_id, [url], tier)
 
     def session_status(self) -> dict[str, Any]:
         torrents = self.list_torrents()
@@ -443,6 +461,9 @@ class TorrentEngine:
         }
 
     def update_settings(self, changes: dict[str, Any]) -> dict[str, Any]:
+        changes = dict(changes)
+        if "tracker_list" in changes:
+            changes["tracker_list"] = normalize_tracker_urls(changes["tracker_list"], reject_invalid=True)
         allowed = set(asdict(self.settings))
         for key, value in changes.items():
             if key in allowed:
