@@ -28,7 +28,7 @@ VersionInfoDescription=BT Apokalypse installer
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
-Name: "magnethandler"; Description: "Open magnet links with BT Apokalypse"; GroupDescription: "Browser integration:"
+Name: "associations"; Description: "Open .torrent files and magnet links with BT Apokalypse"; GroupDescription: "File and link associations:"
 
 [Files]
 Source: "..\dist\BT Apokalypse\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -38,8 +38,9 @@ Name: "{group}\BT Apokalypse"; Filename: "{app}\BT Apokalypse.exe"
 Name: "{autodesktop}\BT Apokalypse"; Filename: "{app}\BT Apokalypse.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\BT Apokalypse.exe"; Parameters: "--register-magnet"; Tasks: magnethandler; Flags: runhidden waituntilterminated
+Filename: "{app}\BT Apokalypse.exe"; Parameters: "--register-associations"; Tasks: associations; Flags: runhidden waituntilterminated
+Filename: "ms-settings:defaultapps?registeredAppUser=BT%20Apokalypse"; Description: "Confirm BT Apokalypse file and link defaults in Windows"; Tasks: associations; Flags: shellexec nowait postinstall skipifsilent
 Filename: "{app}\BT Apokalypse.exe"; Description: "Launch BT Apokalypse"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "{app}\BT Apokalypse.exe"; Parameters: "--unregister-magnet"; Flags: runhidden waituntilterminated skipifdoesntexist
+Filename: "{app}\BT Apokalypse.exe"; Parameters: "--unregister-associations"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "RemoveTorrentAssociations"

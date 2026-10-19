@@ -17,7 +17,7 @@ BT Apokalypse is a self-hosted BitTorrent client with a browser interface. Its t
 - Peer inspection and one-click persistent IP bans
 - PeerGuardian, eMule, CIDR, IP-range, and single-IP blocklist imports from a file or URL
 - Server-side folder browser, including Windows drive selection
-- Windows `magnet:` protocol integration for links clicked in Chrome, Edge, Firefox, and other browsers
+- Windows integration for `.torrent` files and `magnet:` links clicked in browsers or File Explorer
 - Windows task-tray controls for reopening the WebUI or shutting down the background client
 - Prefer or require encrypted peer connections and reduce identifying protocol data with anonymous mode
 - Bind torrent traffic to a selected network adapter, including ProtonVPN and other VPN tunnels
@@ -56,19 +56,19 @@ traffic on the VPN tunnel. Proton does not offer SOCKS5; those fields are for ot
 using Proton's port forwarding, copy its assigned port into **Torrent listen port** and disable UPnP and
 NAT-PMP. Proton can assign a new port after reconnecting.
 
-On Windows, open **Settings → Browser integration** and enable the magnet handler. Browsers may show a
-one-time confirmation before opening BT Apokalypse. If the client is not running when a magnet link is
-clicked, the handler starts it in the background and then adds the torrent. The setting is reversible
-and restores the previous per-user magnet handler when one was present. Fully restart browsers that
-still show the name of an older torrent client, then choose BT Apokalypse once and allow future links.
+On Windows, select **Open .torrent files and magnet links with BT Apokalypse** during installation, or
+enable it later under **Settings → Browser integration**. Windows may open Default Apps so you can
+confirm BT Apokalypse when another client already owns an association. Clicking either kind starts the
+client when needed, adds the torrent, and opens the WebUI. The setting is reversible and restores the
+previous per-user handlers when possible.
 The packaged application remains available in the Windows notification area while it is running. Use
 **Open WebUI** to reopen the browser interface or **Exit BT Apokalypse** to shut down the client cleanly.
 
 The same integration can be managed from PowerShell:
 
 ```powershell
-apokalypse --register-magnet
-apokalypse --unregister-magnet
+apokalypse --register-associations
+apokalypse --unregister-associations
 ```
 
 The configured folders are paths on the computer running BT Apokalypse. The process must have read and
@@ -103,7 +103,7 @@ Build outputs:
 - `release\BT-Apokalypse-Setup-0.1.0.exe` — installer, when Inno Setup 6 is installed
 
 The installer installs per-user without administrator access, creates Start Menu shortcuts, offers a
-desktop shortcut, and can register the `magnet:` protocol. Installed application data is kept in
+desktop shortcut, and can register `.torrent` files and the `magnet:` protocol. Installed application data is kept in
 `%LOCALAPPDATA%\BT Apokalypse`, separate from the program files. Run the build on Windows x64 to produce
 the Windows x64 release.
 

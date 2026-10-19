@@ -18,7 +18,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .engine import TorrentEngine
-from .protocol import magnet_handler_status, register_magnet_handler, unregister_magnet_handler
+from .protocol import (
+    magnet_handler_status,
+    open_default_apps,
+    register_magnet_handler,
+    unregister_magnet_handler,
+)
 from .security import verify_password
 
 STATIC_DIR = Path(__file__).with_name("static")
@@ -430,7 +435,10 @@ def magnet_integration_status() -> dict[str, Any]:
 @app.post("/api/integration/magnet")
 def register_magnet_integration() -> dict[str, Any]:
     try:
-        return register_magnet_handler()
+        result = register_magnet_handler()
+        if result.get("windows_confirmation_required"):
+            open_default_apps()
+        return result
     except RuntimeError as exc:
         raise HTTPException(400, str(exc)) from exc
 

@@ -1,4 +1,4 @@
-"""Application and magnet protocol entry point."""
+"""Application and Windows torrent-association entry point."""
 
 import argparse
 import os
@@ -20,22 +20,30 @@ def run() -> None:
     parser.add_argument("--tray", action="store_true", help="show a Windows notification-area icon")
     parser.add_argument("--no-tray", action="store_true", help="do not show a notification-area icon")
     parser.add_argument("--magnet", help="submit a magnet URI to the local client")
-    parser.add_argument("--register-magnet", action="store_true", help="register as the Windows magnet handler")
-    parser.add_argument("--unregister-magnet", action="store_true", help="restore the previous magnet handler")
+    parser.add_argument("--torrent", help="submit a .torrent file to the local client")
+    parser.add_argument(
+        "--register-associations",
+        action="store_true",
+        help="register as the Windows magnet and .torrent handler",
+    )
+    parser.add_argument("--unregister-associations", action="store_true", help="restore previous handlers")
+    parser.add_argument("--register-magnet", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--unregister-magnet", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--self-test", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     from apokalypse.protocol import (
         register_magnet_handler,
         submit_magnet,
+        submit_torrent_file,
         unregister_magnet_handler,
         write_handler_error,
     )
 
-    if args.register_magnet:
+    if args.register_associations or args.register_magnet:
         print(register_magnet_handler())
         return
-    if args.unregister_magnet:
+    if args.unregister_associations or args.unregister_magnet:
         print(unregister_magnet_handler())
         return
     if args.self_test:
@@ -70,6 +78,15 @@ def run() -> None:
     if args.magnet:
         try:
             submit_magnet(args.magnet, f"http://127.0.0.1:{port}")
+            webbrowser.open(f"http://127.0.0.1:{port}")
+        except Exception as exc:
+            write_handler_error(exc)
+            raise
+        return
+    if args.torrent:
+        try:
+            submit_torrent_file(args.torrent, f"http://127.0.0.1:{port}")
+            webbrowser.open(f"http://127.0.0.1:{port}")
         except Exception as exc:
             write_handler_error(exc)
             raise

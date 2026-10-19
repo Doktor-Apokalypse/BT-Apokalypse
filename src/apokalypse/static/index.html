@@ -6,7 +6,7 @@
   <title>BT Apokalypse</title>
   <link rel="icon" type="image/x-icon" sizes="32x32" href="/static/favicon-32.ico">
   <link rel="icon" type="image/x-icon" sizes="64x64" href="/static/favicon-64.ico">
-  <link rel="stylesheet" href="/static/app.css?v=20261018-3">
+  <link rel="stylesheet" href="/static/app.css?v=20261019-1">
 </head>
 <body>
   <div class="app-shell">
@@ -143,7 +143,7 @@
         <label>Tracker list <small>(one URL per line)</small><textarea name="tracker_list" rows="6" placeholder="udp://tracker.example:80/announce&#10;https://tracker.example/announce"></textarea></label>
         <p class="help">Duplicate tracker URLs already supplied by a torrent or magnet link are skipped.</p>
         <h3>Browser integration</h3>
-        <div class="integration-row"><div><strong>Open magnet links in BT Apokalypse</strong><small id="magnet-handler-status">Checking Windows association…</small></div><button type="button" class="secondary" id="magnet-handler-toggle">Enable</button></div>
+        <div class="integration-row"><div><strong>Open .torrent files and magnet links in BT Apokalypse</strong><small id="magnet-handler-status">Checking Windows associations…</small></div><button type="button" class="secondary" id="magnet-handler-toggle">Enable</button></div>
         <h3>Speed limits <small>(0 is unlimited)</small></h3>
         <div class="two-col"><label>Download KiB/s<input name="download_limit_kib" type="number" min="0"></label><label>Upload KiB/s<input name="upload_limit_kib" type="number" min="0"></label></div>
       </div>
@@ -192,6 +192,6 @@
   </dialog>
 
   <div id="toast-stack" aria-live="polite"></div>
-  <script src="/static/app.js?v=20261018-3" defer></script>
+  <script src="/static/app.js?v=20261019-1" defer></script>
 </body>
 </html>

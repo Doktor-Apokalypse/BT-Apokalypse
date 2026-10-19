@@ -192,12 +192,12 @@ async function loadMagnetHandler() {
   try {
     const integration = await api("/api/integration/magnet"); const button = $("#magnet-handler-toggle");
     button.dataset.registered = String(integration.registered); button.textContent = integration.registered ? "Disable" : "Enable";
-    button.disabled = !integration.supported; $("#magnet-handler-status").textContent = !integration.supported ? "Available on Windows" : integration.registered ? "Registered for this Windows account · restart browsers showing an old app name" : "Magnet links currently use another application";
+    button.disabled = !integration.supported; $("#magnet-handler-status").textContent = !integration.supported ? "Available on Windows" : integration.registered ? "Registered for .torrent files and magnet links" : integration.windows_confirmation_required ? "Registered with Windows · choose BT Apokalypse for .torrent and MAGNET on the Default Apps page" : ".torrent files or magnet links currently use another application";
   } catch (error) { $("#magnet-handler-status").textContent = error.message; }
 }
 async function toggleMagnetHandler() {
   const registered = $("#magnet-handler-toggle").dataset.registered === "true";
-  try { await api("/api/integration/magnet", {method: registered ? "DELETE" : "POST"}); await loadMagnetHandler(); toast(registered ? "Magnet link handling disabled" : "Magnet links will open in BT Apokalypse"); }
+  try { await api("/api/integration/magnet", {method: registered ? "DELETE" : "POST"}); await loadMagnetHandler(); toast(registered ? "Torrent file and magnet handling disabled" : "Torrent files and magnet links will open in BT Apokalypse"); }
   catch (error) { toast(error.message, true); }
 }
 async function saveSettings(event) {

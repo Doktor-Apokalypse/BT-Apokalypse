@@ -18,6 +18,7 @@ def test_webui_and_core_api_start(tmp_path, monkeypatch) -> None:
         assert 'name="max_active_seeds"' in page.text
         assert 'name="add_trackers_to_new_torrents"' in page.text
         assert 'name="tracker_list"' in page.text
+        assert "Open .torrent files and magnet links in BT Apokalypse" in page.text
         assert 'name="encryption_mode"' in page.text
         assert 'name="randomize_listen_port"' in page.text
         assert 'name="bind_interface"' in page.text
